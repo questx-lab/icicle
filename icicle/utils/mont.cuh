@@ -23,6 +23,8 @@ namespace mont {
       int num_blocks = (n + num_threads - 1) / num_threads;
       MontgomeryKernel<E, is_into><<<num_blocks, num_threads, 0, stream>>>(d_inout, n);
 
+      cudaStreamSynchronize(stream);
+
       return 0; // TODO: void with propper error handling
     }
 

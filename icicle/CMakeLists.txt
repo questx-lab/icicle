@@ -85,6 +85,7 @@ if (NOT BUILD_TESTS)
     icicle
     utils/error_handler.cu
     utils/vec_ops.cu
+    utils/mont.cu
     primitives/field.cu
     primitives/projective.cu
     appUtils/msm/msm.cu
@@ -109,11 +110,15 @@ if (NOT BUILD_TESTS)
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym NTTCuda=${CURVE}NTTCuda ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym GetDefaultNTTConfig=${CURVE}DefaultNTTConfig ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym InitializeDomain=${CURVE}InitializeDomain ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
+    COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym AffineConvertMontgomery=${CURVE}AffineConvertMontgomery ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
+    COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym ProjectiveConvertMontgomery=${CURVE}ProjectiveConvertMontgomery ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
+    COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym InitializeDomain=${CURVE}InitializeDomain ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     # COMMAND ${CMAKE_OBJCOPY} ARGS --prefix-symbols=${CURVE}_ ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     # COMMAND ${CMAKE_OBJCOPY} ARGS --prefix-symbols=${CURVE}_ ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/lde/lde.cu.o
     COMMAND ${CMAKE_AR} ARGS -rcs ${LIBRARY_OUTPUT_DIRECTORY}/libingo_${CURVE}.a 
     ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/error_handler.cu.o
     ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/vec_ops.cu.o
+    ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
     ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/primitives/field.cu.o
     ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/primitives/projective.cu.o
     ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/msm/msm.cu.o 

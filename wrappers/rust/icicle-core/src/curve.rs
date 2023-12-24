@@ -16,6 +16,10 @@ pub trait CurveConfig: Debug + PartialEq + Copy + Clone {
     fn to_affine(point: *const Projective<Self>, point_aff: *mut Affine<Self>);
     fn generate_random_projective_points(size: usize) -> Vec<Projective<Self>>;
     fn generate_random_affine_points(size: usize) -> Vec<Affine<Self>>;
+    fn affine_from_montgomery(points: &mut [Affine<Self>]);
+    fn affine_to_montgomery(points: &mut [Affine<Self>]);
+    fn projective_from_montgomery(points: &mut [Projective<Self>]);
+    fn projective_to_montgomery(points: &mut [Projective<Self>]);
 
     #[cfg(feature = "arkworks")]
     type ArkSWConfig: SWCurveConfig;
@@ -173,7 +177,8 @@ where
 macro_rules! impl_curve {
     (
         $scalar_field:ident,
-        $base_field:ident
+        $base_field:ident,
+        $curve_prefix:literal
     ) => {
         #[derive(Debug, PartialEq, Copy, Clone)]
         pub struct CurveCfg {}
@@ -186,6 +191,10 @@ macro_rules! impl_curve {
             fn ToAffine(point: *const G1Projective, point_out: *mut G1Affine);
             fn GenerateProjectivePoints(points: *mut G1Projective, size: usize);
             fn GenerateAffinePoints(points: *mut G1Affine, size: usize);
+            #[link_name = concat!($curve_prefix, "AffineConvertMontgomery")]
+            fn AffineConvertMontgomery(points: *mut G1Affine, size: usize, is_into: u8, ctx: *const DeviceContext);
+            #[link_name = concat!($curve_prefix, "ProjectiveConvertMontgomery")]
+            fn ProjectiveConvertMontgomery(points: *mut G1Projective, size: usize, is_into: u8, ctx: *const DeviceContext);
         }
 
         impl CurveConfig for CurveCfg {
@@ -210,6 +219,22 @@ macro_rules! impl_curve {
                 let mut res = vec![G1Affine::zero(); size];
                 unsafe { GenerateAffinePoints(&mut res[..] as *mut _ as *mut G1Affine, size) };
                 res
+            }
+
+            fn affine_from_montgomery(points: &mut [G1Affine]) {
+                unsafe { AffineConvertMontgomery(points as *mut _ as *mut G1Affine, points.len(), 0, &get_default_device_context() as *const _ as *const DeviceContext) }
+            }
+
+            fn affine_to_montgomery(points: &mut [G1Affine]) {
+                unsafe { AffineConvertMontgomery(points as *mut _ as *mut G1Affine, points.len(), 1, &get_default_device_context() as *const _ as *const DeviceContext) }
+            }
+
+            fn projective_from_montgomery(points: &mut [G1Projective]) {
+                unsafe { ProjectiveConvertMontgomery(points as *mut _ as *mut G1Projective, points.len(), 0, &get_default_device_context() as *const _ as *const DeviceContext) }
+            }
+
+            fn projective_to_montgomery(points: &mut [G1Projective]) {
+                unsafe { ProjectiveConvertMontgomery(points as *mut _ as *mut G1Projective, points.len(), 1, &get_default_device_context() as *const _ as *const DeviceContext) }
             }
 
             #[cfg(feature = "arkworks")]
@@ -238,6 +263,11 @@ macro_rules! impl_curve_tests {
         #[test]
         fn test_point_equality() {
             check_point_equality::<$base_limbs, $field_config, $curve_config>()
+        }
+
+        #[test]
+        fn test_montgomery_conversions() {
+            check_montgomery_conversions::<CurveCfg>();
         }
     };
 }
