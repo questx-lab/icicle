@@ -1,5 +1,5 @@
-use icicle_cuda_runtime::{device_context::DeviceContext, error::CudaResult};
 use crate::curve::{Affine, CurveConfig, Projective};
+use icicle_cuda_runtime::{device_context::DeviceContext, error::CudaResult};
 
 #[cfg(feature = "arkworks")]
 pub mod tests;
@@ -43,7 +43,7 @@ pub struct MSMConfig<'a> {
     pub are_scalars_on_device: bool,
 
     /// True if scalars are in Montgomery form and false otherwise. Default value: true.
-    pub are_scalars_montgomery_form: bool,    
+    pub are_scalars_montgomery_form: bool,
 
     /// True if points are on device and false if they're on host. Default value: false.
     pub are_points_on_device: bool,

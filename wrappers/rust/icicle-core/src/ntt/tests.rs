@@ -260,7 +260,9 @@ where
                     config.are_outputs_on_device = true;
                     config.are_inputs_on_device = true;
                     config.is_async = true;
-                    config.ctx.stream = &stream;
+                    config
+                        .ctx
+                        .stream = &stream;
                     Fc::ntt(
                         &scalars_d.as_slice(),
                         NTTDir::kForward,

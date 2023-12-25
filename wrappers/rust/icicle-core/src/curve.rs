@@ -194,7 +194,12 @@ macro_rules! impl_curve {
             #[link_name = concat!($curve_prefix, "AffineConvertMontgomery")]
             fn AffineConvertMontgomery(points: *mut G1Affine, size: usize, is_into: u8, ctx: *const DeviceContext);
             #[link_name = concat!($curve_prefix, "ProjectiveConvertMontgomery")]
-            fn ProjectiveConvertMontgomery(points: *mut G1Projective, size: usize, is_into: u8, ctx: *const DeviceContext);
+            fn ProjectiveConvertMontgomery(
+                points: *mut G1Projective,
+                size: usize,
+                is_into: u8,
+                ctx: *const DeviceContext,
+            );
         }
 
         impl CurveConfig for CurveCfg {
@@ -222,19 +227,47 @@ macro_rules! impl_curve {
             }
 
             fn affine_from_montgomery(points: &mut [G1Affine]) {
-                unsafe { AffineConvertMontgomery(points as *mut _ as *mut G1Affine, points.len(), 0, &get_default_device_context() as *const _ as *const DeviceContext) }
+                unsafe {
+                    AffineConvertMontgomery(
+                        points as *mut _ as *mut G1Affine,
+                        points.len(),
+                        0,
+                        &get_default_device_context() as *const _ as *const DeviceContext,
+                    )
+                }
             }
 
             fn affine_to_montgomery(points: &mut [G1Affine]) {
-                unsafe { AffineConvertMontgomery(points as *mut _ as *mut G1Affine, points.len(), 1, &get_default_device_context() as *const _ as *const DeviceContext) }
+                unsafe {
+                    AffineConvertMontgomery(
+                        points as *mut _ as *mut G1Affine,
+                        points.len(),
+                        1,
+                        &get_default_device_context() as *const _ as *const DeviceContext,
+                    )
+                }
             }
 
             fn projective_from_montgomery(points: &mut [G1Projective]) {
-                unsafe { ProjectiveConvertMontgomery(points as *mut _ as *mut G1Projective, points.len(), 0, &get_default_device_context() as *const _ as *const DeviceContext) }
+                unsafe {
+                    ProjectiveConvertMontgomery(
+                        points as *mut _ as *mut G1Projective,
+                        points.len(),
+                        0,
+                        &get_default_device_context() as *const _ as *const DeviceContext,
+                    )
+                }
             }
 
             fn projective_to_montgomery(points: &mut [G1Projective]) {
-                unsafe { ProjectiveConvertMontgomery(points as *mut _ as *mut G1Projective, points.len(), 1, &get_default_device_context() as *const _ as *const DeviceContext) }
+                unsafe {
+                    ProjectiveConvertMontgomery(
+                        points as *mut _ as *mut G1Projective,
+                        points.len(),
+                        1,
+                        &get_default_device_context() as *const _ as *const DeviceContext,
+                    )
+                }
             }
 
             #[cfg(feature = "arkworks")]
