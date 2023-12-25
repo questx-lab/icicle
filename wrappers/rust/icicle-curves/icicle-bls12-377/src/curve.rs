@@ -12,7 +12,7 @@ pub(crate) const BASE_LIMBS: usize = 6;
 
 impl_scalar_field!(SCALAR_LIMBS, ScalarField, ScalarCfg);
 impl_base_field!(BASE_LIMBS, BaseField, BaseCfg);
-impl_curve!(ScalarField, BaseFieldm "bls12_377");
+impl_curve!(ScalarField, BaseField, "bls12_377");
 
 #[cfg(test)]
 mod tests {
