@@ -28,7 +28,7 @@ pub fn check_montgomery_conversions<C: CurveConfig>() {
         .copy_from_host(&affine_points)
         .unwrap();
 
-    C::affine_to_montgomery(affine_buffer.as_slice());
+    C::affine_to_montgomery(affine_buffer.as_slice_mut());
 
     let mut affine_montgomery_points = vec![Affine::<C>::zero(); size];
     affine_buffer
@@ -41,7 +41,7 @@ pub fn check_montgomery_conversions<C: CurveConfig>() {
             .unwrap()
     );
 
-    C::affine_from_montgomery(affine_buffer.as_slice());
+    C::affine_from_montgomery(affine_buffer.as_slice_mut());
     let mut affine_montgomery_points = vec![Affine::<C>::zero(); size];
     affine_buffer
         .copy_to_host(&mut affine_montgomery_points)

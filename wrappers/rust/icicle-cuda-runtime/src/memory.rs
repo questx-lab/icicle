@@ -21,7 +21,11 @@ impl<'a, T> DeviceSlice<'a, T> {
             .is_empty()
     }
 
-    pub fn as_slice(&mut self) -> &mut [T] {
+    pub fn as_slice(&self) -> &[T] {
+        self.0
+    }
+
+    pub fn as_slice_mut(&mut self) -> &mut [T] {
         self.0
     }
 

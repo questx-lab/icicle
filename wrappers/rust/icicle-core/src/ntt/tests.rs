@@ -267,14 +267,14 @@ where
                         &scalars_d.as_slice(),
                         NTTDir::kForward,
                         &config,
-                        &mut ntt_out_d.as_slice(),
+                        &mut ntt_out_d.as_slice_mut(),
                     )
                     .unwrap();
                     Fc::ntt(
                         &ntt_out_d.as_slice(),
                         NTTDir::kInverse,
                         &config,
-                        &mut scalars_d.as_slice(),
+                        &mut scalars_d.as_slice_mut(),
                     )
                     .unwrap();
                     let mut intt_result_h = vec![F::zero(); test_size * batch_size];

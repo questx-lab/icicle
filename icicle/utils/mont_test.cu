@@ -16,7 +16,8 @@ typedef curve_config::scalar_t test_scalar;
 typedef curve_config::projective_t test_projective;
 typedef curve_config::affine_t test_affine;
 
-int main() {
+int main()
+{
   int N = 1000;
 
   test_scalar* scalars = new test_scalar[N];
