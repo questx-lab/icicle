@@ -599,7 +599,6 @@ namespace msm {
       if (large_buckets_to_compute > 0 && bucket_th > 0) {
         // all the large buckets need to be accumulated before the final summation
         cudaStreamWaitEvent(stream, event_large_buckets_accumulated);
-        cudaStreamDestroy(stream_large_buckets);
       }
 
 #ifdef SSM_SUM
