@@ -33,7 +33,7 @@ where
             .stream = &stream;
         cfg.is_async = true;
         cfg.are_results_on_device = true;
-        C::msm(&scalars, &points, &cfg, &mut msm_results.as_slice()).unwrap();
+        C::msm(&scalars, &points, &cfg, msm_results.as_slice_mut()).unwrap();
 
         let mut msm_host_result = vec![Projective::<C>::zero(); 1];
         msm_results
@@ -94,10 +94,10 @@ where
             cfg.batch_size = batch_size as i32;
             cfg.is_async = true;
             cfg.are_results_on_device = true;
-            C::msm(&scalars, &points, &cfg, &mut msm_results_1.as_slice()).unwrap();
+            C::msm(&scalars, &points, &cfg, msm_results_1.as_slice_mut()).unwrap();
             cfg.points_size = (test_size * batch_size) as i32;
             cfg.are_points_on_device = true;
-            C::msm(&scalars, &points_d.as_slice(), &cfg, &mut msm_results_2.as_slice()).unwrap();
+            C::msm(&scalars, &points_d.as_slice(), &cfg, msm_results_2.as_slice_mut()).unwrap();
 
             let mut msm_host_result_1 = vec![Projective::<C>::zero(); batch_size];
             let mut msm_host_result_2 = vec![Projective::<C>::zero(); batch_size];
