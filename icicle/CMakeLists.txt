@@ -110,6 +110,7 @@ if (NOT BUILD_TESTS)
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym NTTCuda=${CURVE}NTTCuda ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym GetDefaultNTTConfig=${CURVE}DefaultNTTConfig ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym InitializeDomain=${CURVE}InitializeDomain ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
+    COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym ScalarConvertMontgomery=${CURVE}ScalarConvertMontgomery ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym AffineConvertMontgomery=${CURVE}AffineConvertMontgomery ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym ProjectiveConvertMontgomery=${CURVE}ProjectiveConvertMontgomery ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/utils/mont.cu.o
     COMMAND ${CMAKE_OBJCOPY} ARGS --redefine-sym InitializeDomain=${CURVE}InitializeDomain ${PROJECT_BINARY_DIR}/CMakeFiles/icicle.dir/appUtils/ntt/ntt.cu.o
