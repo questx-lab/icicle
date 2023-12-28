@@ -54,7 +54,7 @@ where
             .iter()
             .map(|v| v.to_ark())
             .collect::<Vec<F::ArkEquivalent>>();
-        // if we simply transmute arkworks types, we'll get scalars in Montgomery format 
+        // if we simply transmute arkworks types, we'll get scalars in Montgomery format
         let scalars_mont = unsafe { &*(&ark_scalars[..] as *const _ as *const _) };
 
         let config = Fc::get_default_ntt_config();
@@ -66,7 +66,8 @@ where
         ark_domain.fft_in_place(&mut ark_ntt_result);
         assert_ne!(ark_ntt_result, ark_scalars);
 
-        let ntt_result_as_ark = unsafe { &*(&ntt_result[..] as *const _ as *const [<F as ArkConvertible>::ArkEquivalent]) };
+        let ntt_result_as_ark =
+            unsafe { &*(&ntt_result[..] as *const _ as *const [<F as ArkConvertible>::ArkEquivalent]) };
         assert_eq!(ark_ntt_result, ntt_result_as_ark);
 
         let mut intt_result = vec![F::zero(); test_size];
@@ -142,7 +143,7 @@ where
 
 pub fn check_ntt_arbitrary_coset<F: FieldImpl + ArkConvertible, Fc: FieldConfig + NTT<F> + GenerateRandom<F>>()
 where
-    F::ArkEquivalent: FftField + PrimeField
+    F::ArkEquivalent: FftField + PrimeField,
 {
     let mut seed = test_rng();
     let test_sizes = [1 << 4, 1 << 16];
