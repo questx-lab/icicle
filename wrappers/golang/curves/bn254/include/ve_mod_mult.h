@@ -28,12 +28,11 @@ extern "C" {
 #endif
 
 typedef struct {
-  int device_id;         /**< Index of the currently used GPU. Default value: 0. */
   cudaStream_t stream;   /**< Stream to use. Default value: 0. */
-  cudaMemPool_t; /**< Mempool to use. Default value: 0. */
+  int device_id;         /**< Index of the currently used GPU. Default value: 0. */
+  cudaMemPool_t mempool; /**< Mempool to use. Default value: 0. */
 } DeviceContext;
 
-typedef struct BN254_projective_t BN254_projective_t;
 typedef struct BN254_scalar_t BN254_scalar_t;
 
 int bn254AddCuda(
@@ -50,7 +49,7 @@ int bn254SubCuda(
   BN254_scalar_t* vec_b,
   int n,
   bool is_on_device,
-  DeviceContext* ctx,
+  DeviceContext ctx,
   BN254_scalar_t* result
 );
 

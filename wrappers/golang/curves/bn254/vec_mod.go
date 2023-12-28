@@ -24,6 +24,7 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
+	cuda "local/hello/icicle/wrappers/golang/cuda_runtime"
 )
 
 // func VecScalarMulMod(scalarVec1, scalarVec2 unsafe.Pointer, size int) int {
@@ -47,7 +48,6 @@ func VecScalarAdd(in1_d, in2_d, out_d unsafe.Pointer, ctx C.DeviceContext, size 
 	sizeC := C.int(size)
 	onDeviceC := C.bool(true)
 	out_dC := (*C.BN254_scalar_t)(out_d)
-
 
 	ret := C.bn254AddCuda(in1_dC, in2_dC, sizeC, onDeviceC, ctx, out_dC)
 
