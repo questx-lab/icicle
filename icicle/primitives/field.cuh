@@ -85,6 +85,24 @@ public:
     return Field{inv.storages[logn - 1]};
   }
 
+  static constexpr HOST_INLINE unsigned get_omegas_count() {
+    if constexpr (has_member_name<CONFIG>()) { 
+      return CONFIG::omegas_count;
+    } else { 
+      return 0;
+    }
+  }
+
+  template <typename T>
+  static constexpr bool has_member_name() { 
+    // if (std::is_same<unsigned, decltype(T::omegas_count)>) {
+    if (sizeof(T::omegas_count) > 0) {
+      return true; 
+    } else {
+      return false; 
+    }
+  }
+
   // private:
   typedef storage<TLC> ff_storage;
   typedef storage<2 * TLC> ff_wide_storage;
