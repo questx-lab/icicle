@@ -61,6 +61,10 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
         }
     }
 
+    pub fn from_slice(data: &'a mut [T]) -> Self {
+        Self::Device(data)
+    }
+
     pub fn on_host(src: Vec<T>) -> Self {
         Self::Host(src)
     }

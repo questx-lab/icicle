@@ -89,20 +89,20 @@ pub fn msm<C: Curve + MSM<C>>(
     cfg: &MSMConfig,
     results: &mut HostOrDeviceSlice<Projective<C>>,
 ) -> IcicleResult<()> {
-    if scalars.len() % points.len() != 0 {
-        panic!(
-            "Number of points {} does not divide the number of scalars {}",
-            points.len(),
-            scalars.len()
-        );
-    }
-    if scalars.len() % results.len() != 0 {
-        panic!(
-            "Number of results {} does not divide the number of scalars {}",
-            results.len(),
-            scalars.len()
-        );
-    }
+    // if scalars.len() % points.len() != 0 {
+    //     panic!(
+    //         "Number of points {} does not divide the number of scalars {}",
+    //         points.len(),
+    //         scalars.len()
+    //     );
+    // }
+    // if scalars.len() % results.len() != 0 {
+    //     panic!(
+    //         "Number of results {} does not divide the number of scalars {}",
+    //         results.len(),
+    //         scalars.len()
+    //     );
+    // }
     let mut local_cfg = cfg.clone();
     local_cfg.points_size = points.len() as i32;
     local_cfg.batch_size = results.len() as i32;
@@ -148,7 +148,7 @@ macro_rules! impl_msm {
                 unsafe {
                     msm_cuda(
                         scalars.as_ptr(),
-                        points.as_ptr(),
+                        points.as_slice()[..scalars.len()].as_ptr(),
                         (scalars.len() / results.len()) as i32,
                         cfg,
                         results.as_mut_ptr(),
