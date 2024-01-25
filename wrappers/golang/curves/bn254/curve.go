@@ -34,19 +34,64 @@ var bn254BaseField = BaseField {
 	},
 }
 
-func (s* ScalarField) GenerateRandom(size int) []ScalarField {
+func GenerateScalars(size int) []ScalarField {
 	scalars := make([]ScalarField, size)
 	scalarsP := unsafe.Pointer(&scalars[0])
 	scalarsC := (*C.BN254_scalar_t)(scalarsP)
-	C.GenerateScalars(scalarsC, size)
+	C.BN254GenerateScalars(scalarsC, size)
 	
 	return scalars
+}
+
+func convertScalarsMontgomery(values unsafe.Pointer, isInto bool) CudaError {
+	C.BN254ScalarConvertMontgomery() // templatize this per curve??
+}
+
+func ToMontgomery(values unsafe.Pointer) CudaError {
+	return convertScalarsMontgomery(values, true)
+}
+
+func FromMontgomery(values unsafe.Pointer) CudaError {
+	return convertScalarsMontgomery(values, false)
 }
 
 type Projective struct {
 	core.Projective
 }
 
+func GenerateProjectivePoints(size int, ) []Projective {
+	points := make([]Projective, size)
+	pointsP := unsafe.Pointer(&points[0])
+	pointsC := (*C.BN254_projective_t)(pointsP)
+	C.BN254GenerateProjectivePoints(pointsC, size)
+	
+	return points
+}
+
+
+func (p* Projective) ToAffine() Affine {
+	a := Affine {}
+	C.BN254ToAffine(unsafe.Pointer(p), unsafe.Pointer(&a))
+	return a
+}
+
+func (p* Projective) Eq(p2* Projective) bool {
+	return C.BN254Eq(unsafe.Pointer(p), unsafe.Pointer(p2)) != 0
+}
+
 type Affine struct {
 	core.Affine
+}
+
+func (a* Affine) FromProjective(p Projective) Affine {
+	return p.ToAffine()
+}
+
+func GenerateAffinePoints(size int) []Affine {
+	points := make([]Affine, size)
+	pointsP := unsafe.Pointer(&points[0])
+	pointsC := (*C.BN254_affine_t)(pointsP)
+	C.BN254GenerateAffinePoints(pointsC, size)
+	
+	return points
 }

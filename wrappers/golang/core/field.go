@@ -4,6 +4,15 @@ import (
 	"encoding/binary"
 )
 
+type FieldInter interface {
+	GetLimbs() []uint64
+	FromLimbs(limbs []uint64) Field
+	Zero() Field
+	One() Field
+	FromBytesLittleEndian(bytes []byte) Field
+	ToBytesLittleEndian() []byte
+}
+
 type Field struct {
 	NumLimbs int8
 	limbs []uint64 // need to constrain this by NumLimbs
