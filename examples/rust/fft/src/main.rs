@@ -82,9 +82,9 @@ pub fn run_fft(a: Vec<ArkFrBN254>) {
         .copy_from_host(&inout)
         .unwrap();
 
-    fft_evaluate(&mut inout_slice, &mut ws_slice, n as u32, is_mont).unwrap();
+    fft_evaluate(&mut inout_slice, &ws_slice, n as u32, is_mont).unwrap();
 
-    fft_interpolate(&mut inout_slice, &mut ws_inv_slice, n as u32, is_mont).unwrap();
+    fft_interpolate(&mut inout_slice, &ws_inv_slice, n as u32, is_mont).unwrap();
 
     println!("Done Running on GPU, time = {:.2?}", start.elapsed());
     let start = Instant::now();

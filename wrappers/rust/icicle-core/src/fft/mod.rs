@@ -5,14 +5,14 @@ use crate::{error::IcicleResult, traits::FieldImpl};
 pub trait Fft<F: FieldImpl> {
     fn evaluate_unchecked(
         inout: &mut HostOrDeviceSlice<F>,
-        ws: &mut HostOrDeviceSlice<F>,
+        ws: &HostOrDeviceSlice<F>,
         n: u32,
         is_montgomery: bool,
     ) -> IcicleResult<()>;
 
     fn interpolate_unchecked(
         inout: &mut HostOrDeviceSlice<F>,
-        ws: &mut HostOrDeviceSlice<F>,
+        ws: &HostOrDeviceSlice<F>,
         n: u32,
         is_montgomery: bool,
     ) -> IcicleResult<()>;
@@ -20,7 +20,7 @@ pub trait Fft<F: FieldImpl> {
 
 pub fn fft_evaluate<F>(
     inout: &mut HostOrDeviceSlice<F>,
-    ws: &mut HostOrDeviceSlice<F>,
+    ws: &HostOrDeviceSlice<F>,
     n: u32,
     is_montgomery: bool,
 ) -> IcicleResult<()>
@@ -33,7 +33,7 @@ where
 
 pub fn fft_interpolate<F>(
     inout: &mut HostOrDeviceSlice<F>,
-    ws: &mut HostOrDeviceSlice<F>,
+    ws: &HostOrDeviceSlice<F>,
     n: u32,
     is_montgomery: bool,
 ) -> IcicleResult<()>
@@ -59,7 +59,7 @@ macro_rules! impl_fft {
                 #[link_name = concat!($field_prefix, "FftEvaluate")]
                 pub(crate) fn _fft_evaluate(
                     inout: *mut $field,
-                    ws: *mut $field,
+                    ws: *const $field,
                     n: u32,
                     is_montgomery: bool,
                 ) -> CudaError;
@@ -69,7 +69,7 @@ macro_rules! impl_fft {
                 #[link_name = concat!($field_prefix, "FftInterpolate")]
                 pub(crate) fn _fft_interpolate(
                     inout: *mut $field,
-                    ws: *mut $field,
+                    ws: *const $field,
                     n: u32,
                     is_montgomery: bool,
                 ) -> CudaError;
@@ -79,23 +79,21 @@ macro_rules! impl_fft {
         impl Fft<$field> for $field_config {
             fn evaluate_unchecked(
                 inout: &mut HostOrDeviceSlice<$field>,
-                ws: &mut HostOrDeviceSlice<$field>,
+                ws: &HostOrDeviceSlice<$field>,
                 n: u32,
                 is_montgomery: bool,
             ) -> IcicleResult<()> {
-                unsafe {
-                    $field_prefix_ident::_fft_evaluate(inout.as_mut_ptr(), ws.as_mut_ptr(), n, is_montgomery).wrap()
-                }
+                unsafe { $field_prefix_ident::_fft_evaluate(inout.as_mut_ptr(), ws.as_ptr(), n, is_montgomery).wrap() }
             }
 
             fn interpolate_unchecked(
                 inout: &mut HostOrDeviceSlice<$field>,
-                ws: &mut HostOrDeviceSlice<$field>,
+                ws: &HostOrDeviceSlice<$field>,
                 n: u32,
                 is_montgomery: bool,
             ) -> IcicleResult<()> {
                 unsafe {
-                    $field_prefix_ident::_fft_interpolate(inout.as_mut_ptr(), ws.as_mut_ptr(), n, is_montgomery).wrap()
+                    $field_prefix_ident::_fft_interpolate(inout.as_mut_ptr(), ws.as_ptr(), n, is_montgomery).wrap()
                 }
             }
         }
