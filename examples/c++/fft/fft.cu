@@ -219,8 +219,6 @@ T* fft_gpu(T* host_b, uint n, T* device_ws, T* device_ws_inv, bool invert) {
   // Swap bits
   swap_bits<<< num_blocks, num_threads  >>> (device_b, n, log_n);
 
-  std::cout << "inv_n = " << inv_n << std::endl;
-
   // main loop
   int ws_index = 0;
   for (int pow = 1; ; pow++) {
@@ -239,16 +237,16 @@ T* fft_gpu(T* host_b, uint n, T* device_ws, T* device_ws_inv, bool invert) {
     invert_result<<< num_blocks, num_threads  >>> (device_b, inv_n);
   }
 
-  auto end_time = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-  std::cout << "GPU Kernel running time: " << duration.count() << " microseconds" << std::endl;
-
   T* host_result = (T*)malloc(n * sizeof(T));
   err = cudaMemcpy(host_result, device_b, n * sizeof(T), cudaMemcpyDeviceToHost);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from device to host - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
+
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  std::cout << "GPU Kernel running time: " << duration.count() << " microseconds" << std::endl;
 
   return host_result;
 }
@@ -354,12 +352,12 @@ void test_montgomery(std::vector<int> a) {
 }
 
 std::vector<int> gen_data() {
-  std::vector<int> a = {3, 1, 4, 1, 5, 9, 2, 6};
-  // std::vector<int> a;
-  // for (int i = 0; i < 1 << 4; i++) {
-  //   int random = rand() % 1000;
-  //   a.push_back(random);
-  // }
+  // std::vector<int> a = {3, 1, 4, 1, 5, 9, 2, 6};
+  std::vector<int> a;
+  for (int i = 0; i < 1 << 23; i++) {
+    int random = rand() % 1000;
+    a.push_back(random);
+  }
 
   return a;
 }
@@ -368,8 +366,8 @@ int main(int argc, char** argv) {
   auto a = gen_data();
 
   // auto cpu_result = run_cpu(a);
-  // auto gpu_result = run_gpu(a);
-  test_montgomery(a);
+  auto gpu_result = run_gpu(a);
+  // test_montgomery(a);
 
   // for (int i = 0; i < a.size(); i++) {
   //   if (cpu_result[i] != gpu_result[i]) {

@@ -68,27 +68,27 @@ namespace fft {
 
   template <typename S>
   cudaError_t fft(
-    S* inout, S* ws, int n, bool is_montgomery, bool invert)
+    S* device_inout, S* device_ws, int n, bool is_montgomery, bool invert)
   {
     CHK_INIT_IF_RETURN();
 
-    S* device_inout;
-    S* device_ws;
-    // allocate device array
-    cudaMalloc((void**)&device_inout, n * sizeof(S));
-    cudaMalloc((void**)&device_ws, n * sizeof(S));
+    // S* device_inout;
+    // S* device_ws;
+    // // allocate device array
+    // cudaMalloc((void**)&device_inout, n * sizeof(S));
+    // cudaMalloc((void**)&device_ws, n * sizeof(S));
 
-    // copy from host to device
-    auto err = cudaMemcpy(device_inout, inout, n * sizeof(S), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-      std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
-      return err;
-    }
-    err = cudaMemcpy(device_ws, ws, n * sizeof(S), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-      std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
-      return err;
-    }
+    // // copy from host to device
+    // auto err = cudaMemcpy(device_inout, inout, n * sizeof(S), cudaMemcpyHostToDevice);
+    // if (err != cudaSuccess) {
+    //   std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
+    //   return err;
+    // }
+    // err = cudaMemcpy(device_ws, ws, n * sizeof(S), cudaMemcpyHostToDevice);
+    // if (err != cudaSuccess) {
+    //   std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
+    //   return err;
+    // }
 
     int cuda_device_ix = 0;
     cudaDeviceProp prop;
@@ -137,15 +137,15 @@ namespace fft {
     }
 
     // copy back to host
-    err = cudaMemcpy(inout, device_inout, n * sizeof(S), cudaMemcpyDeviceToHost);
+    // err = cudaMemcpy(inout, device_inout, n * sizeof(S), cudaMemcpyDeviceToHost);
 
     // std::cout << "BBBBB Result: " << std::endl;
     // for (int i = 0; i < 8; i++) {
     //   std::cout << inout[i] << std::endl;
     // }
 
-    cudaFree(device_inout);
-    cudaFree(device_ws);
+    // cudaFree(device_inout);
+    // cudaFree(device_ws);
 
     return CHK_LAST();
   }

@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 #[derive(PartialEq, Copy, Clone)]
 #[repr(C)]
 pub struct Field<const NUM_LIMBS: usize, F: FieldConfig> {
-    limbs: [u64; NUM_LIMBS],
+    pub limbs: [u64; NUM_LIMBS],
     p: PhantomData<F>,
 }
 
