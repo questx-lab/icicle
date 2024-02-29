@@ -5,7 +5,6 @@ use icicle_bn254::curve::ScalarField as IcicleFrBN254;
 use icicle_core::field::Field as IcicleField;
 use icicle_core::traits::FieldConfig;
 use icicle_core::traits::FieldImpl;
-use icicle_core::traits::MontgomeryConvertible;
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::fs;
@@ -71,8 +70,6 @@ pub fn run_fft(a: Vec<ArkFrBN254>) {
         .copy_from_host(&ws_inv)
         .unwrap();
 
-    let is_mont = true;
-
     println!("Done preparing. Start running on GPU... time = {:.2?}", start.elapsed());
     let start = Instant::now();
 
@@ -82,9 +79,9 @@ pub fn run_fft(a: Vec<ArkFrBN254>) {
         .copy_from_host(&inout)
         .unwrap();
 
-    fft_evaluate(&mut inout_slice, &ws_slice, n as u32, is_mont).unwrap();
+    fft_evaluate(&mut inout_slice, &ws_slice, n as u32).unwrap();
 
-    fft_interpolate(&mut inout_slice, &ws_inv_slice, n as u32, is_mont).unwrap();
+    fft_interpolate(&mut inout_slice, &ws_inv_slice, n as u32).unwrap();
 
     println!("Done Running on GPU, time = {:.2?}", start.elapsed());
     let start = Instant::now();
