@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 #[repr(C)]
 pub struct Field<const NUM_LIMBS: usize, F: FieldConfig> {
     pub limbs: [u64; NUM_LIMBS],
-    p: PhantomData<F>,
+    pub p: PhantomData<F>,
 }
 
 unsafe impl<const NUM_LIMBS: usize, F: FieldConfig> Send for Field<NUM_LIMBS, F> {}

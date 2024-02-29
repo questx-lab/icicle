@@ -53,7 +53,6 @@ namespace fft {
     b[x + 1] = b[x + 1] * inv_n;
   }
 
-
   template <typename S>
   cudaError_t fft(
     S* device_inout, S* device_ws, int n, bool invert)
