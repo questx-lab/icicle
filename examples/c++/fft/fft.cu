@@ -3,6 +3,7 @@
 #include <chrono>
 #include <nvml.h>
 #include <vector>
+#include <thread>
 
 #define CURVE_ID 1
 #include "curves/curve_config.cuh"
@@ -182,7 +183,7 @@ void print_runtime(std::string message, std::chrono::time_point< std::chrono::sy
   std::cout << message << duration.count() << " microseconds" << std::endl;
 }
 
-S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
+S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert, cudaStream_t stream) {
   cudaError_t err;
   S* device_b;
 
@@ -194,13 +195,13 @@ S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
   cudaMalloc((void**)&device_b, n * sizeof(S));
 
   // copy from host to device
-  err = cudaMemcpy(device_b, host_b, n * sizeof(S), cudaMemcpyHostToDevice);
+  err = cudaMemcpyAsync(device_b, host_b, n * sizeof(S), cudaMemcpyHostToDevice, stream);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
 
-  print_runtime("memory allocation time: ", start_time);
+  print_runtime("Copy HOST to DEVICE time: ", start_time);
   start_time = std::chrono::high_resolution_clock::now();
 
   int cuda_device_ix = 0;
@@ -214,7 +215,7 @@ S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
 
   const int log_n = log2(n);
   // Swap bits
-  swap_bits<<< num_blocks, num_threads  >>> (device_b, n, log_n);
+  swap_bits<<< num_blocks, num_threads, 0, stream  >>> (device_b, n, log_n);
 
   // main loop
   int ws_index = 0;
@@ -224,28 +225,28 @@ S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
       break;
     }
 
-    fft_kernel<<< num_blocks, num_threads  >>> (device_b, n, inv_n, pow, ws_index, device_ws, device_ws_inv, invert);
+    fft_kernel<<< num_blocks, num_threads, 0, stream  >>> (device_b, n, inv_n, pow, ws_index, device_ws, device_ws_inv, invert);
 
     ws_index += len >> 1;
   }
 
   // If this is interpolatio, invert the result
   if (invert) {
-    invert_result<<< num_blocks, num_threads  >>> (device_b, inv_n);
+    invert_result<<< num_blocks, num_threads, 0, stream  >>> (device_b, inv_n);
   }
 
   print_runtime("Kernel Running time: ", start_time);
-  start_time = std::chrono::high_resolution_clock::now();
-
 
   S* host_result = (S*)malloc(n * sizeof(S));
-  err = cudaMemcpy(host_result, device_b, n * sizeof(S), cudaMemcpyDeviceToHost);
+
+  start_time = std::chrono::high_resolution_clock::now();
+  err = cudaMemcpyAsync(host_result, device_b, n * sizeof(S), cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from device to host - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
 
-  print_runtime("Copy back to host time: ", start_time);
+  print_runtime("Copy DEVICE to HOST time: ", start_time);
   start_time = std::chrono::high_resolution_clock::now();
 
   // printf("GPU num_blocks = %d, num_threads = %d\n", num_blocks, num_threads);
@@ -253,17 +254,9 @@ S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
   return host_result;
 }
 
-S* run_gpu(std::vector<int> a) {
-  cudaError_t err;
-
-  const int log_n = log2(a.size());
+void gpu_allocate(int n, S* &device_ws, S* &device_ws_inv) {
+  const int log_n = log2(n);
   const int root_pw = 1 << log_n;
-
-  int n = a.size();
-  S* a_field = (S*)malloc(n * sizeof(S));
-  for (int i = 0; i < a.size(); i++) {
-    a_field[i] = S::from(a[i]);
-  }
 
   S root = S::omega(log_n);
   S root_inv = S::inverse(root);
@@ -271,31 +264,65 @@ S* run_gpu(std::vector<int> a) {
   S* ws = precompute_w(n, root, root_inv, root_pw, false);
   S* ws_inv = precompute_w(n, root, root_inv, root_pw, true);
 
-  S* device_ws;
-  S* device_ws_inv;
   cudaMalloc((void**)&device_ws, n * sizeof(S));
   cudaMalloc((void**)&device_ws_inv, n * sizeof(S));
   // copy from host to device
-  err = cudaMemcpy(device_ws, ws, n * sizeof(S), cudaMemcpyHostToDevice);
+  auto err = cudaMemcpy(device_ws, ws, n * sizeof(S), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
-    return NULL;
+    // return NULL;
   }
   err = cudaMemcpy(device_ws_inv, ws_inv, n * sizeof(S), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
-    return NULL;
+    // return NULL;
+  }
+}
+
+S* run_gpu(std::vector<int> a) {
+  const int n = a.size();
+  S* device_ws;
+  S* device_ws_inv;
+  S* a_field = (S*)malloc(n * sizeof(S));
+  for (int i = 0; i < a.size(); i++) {
+    a_field[i] = S::from(a[i]);
   }
 
-  // function call
-  auto eval_result = fft_gpu(a_field, n, device_ws, device_ws_inv, false);
-  auto interpolate_result = fft_gpu(eval_result, n, device_ws, device_ws_inv, true);
+  gpu_allocate(n, device_ws, device_ws_inv);
 
-  for (int i = 0; i < 8; i++) {
-    std::cout << eval_result[i] << std::endl;
+  std::vector<std::thread> threads(n);
+
+  const int num_streams = 8;
+  cudaStream_t streams[num_streams];
+  for (int i = 0; i < num_streams; i++) {
+    cudaStreamCreate(&streams[i]);
   }
 
-  return interpolate_result;
+  // fft_gpu(a_field, n, device_ws, device_ws_inv, false, streams[0]);
+
+  // // function call
+  auto start_time = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < num_streams; i++) {
+    // auto eval_result = fft_gpu(a_field, n, device_ws, device_ws_inv, false, streams[i]);
+    threads[i] = std::thread(fft_gpu, a_field, n, device_ws, device_ws_inv, false, streams[i]);
+  }
+
+  for (int i = 0; i < num_streams; i++) {
+    // cudaStreamSynchronize(streams[i]);
+    threads[i].join();
+  }
+
+  print_runtime("Total running time of all streams: ", start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+  // auto interpolate_result = fft_gpu(eval_result, n, device_ws, device_ws_inv, true, streams[0]);
+
+  // for (int i = 0; i < 8; i++) {
+  //   std::cout << eval_result[i] << std::endl;
+  // }
+
+  // return interpolate_result;
+
+  return NULL;
 }
 
 S* run_cpu(std::vector<int> a) {
@@ -308,13 +335,8 @@ S* run_cpu(std::vector<int> a) {
     a_field[i] = S::from(a[i]);
   }
 
-  std::cout << "n = " << n << " log_n = " << log_n << std::endl;
-
   S root = S::omega(log_n);
   S root_inv = S::inverse(root);
-
-  std::cout << "root = " << root << std::endl;
-  std::cout << "root_inv = " << root_inv << std::endl;
 
   // (uint n, S root, S root_inv, uint root_pw, bool invert)
   S* ws = precompute_w(n, root, root_inv, root_pw, false);
@@ -343,13 +365,21 @@ S* run_cpu(std::vector<int> a) {
 }
 
 void run_gpu_multiple() {
+  // const int n = a.size();
+  // S* device_ws;
+  // S* device_ws_inv;
+  // S* a_field = (S*)malloc(n * sizeof(S));
+  // for (int i = 0; i < a.size(); i++) {
+  //   a_field[i] = S::from(a[i]);
+  // }
 
+  // gpu_allocate(n, device_ws, device_ws_inv);
 }
 
 std::vector<int> gen_data() {
   // std::vector<int> a = {3, 1, 4, 1, 5, 9, 2, 6};
   std::vector<int> a;
-  for (int i = 0; i < 1 << 21; i++) {
+  for (int i = 0; i < 1 << 20; i++) {
     int random = rand() % 1000;
     a.push_back(random);
   }
