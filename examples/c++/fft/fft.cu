@@ -11,9 +11,9 @@
 
 using namespace curve_config;
 
-typedef scalar_t T;
+typedef scalar_t S;
 
-void print(std::string tag, T* b, int n) {
+void print(std::string tag, S* b, int n) {
   std::cout << "=================" << std::endl;
   std::cout << "Printing " << tag << std::endl;
 
@@ -32,7 +32,7 @@ uint32_t reverse_bits(uint32_t x)
     return (x >> 16) | (x << 16);
 }
 
-void old_reverse_bit(T* b, uint n) {
+void old_reverse_bit(S* b, uint n) {
   for (int i = 1, j = 0; i < n; i++)
   {
     int bit = n >> 1;
@@ -42,24 +42,24 @@ void old_reverse_bit(T* b, uint n) {
 
     if (i < j) {
       // swap(b[i], b[j]);
-      T tmp = b[i];
+      S tmp = b[i];
       b[i] = b[j];
       b[j] = tmp;
     }
   }
 }
 
-T* precompute_w(uint n, T root, T root_inv, uint root_pw, bool invert) {
-  T* ws = (T*)malloc((n - 1) * sizeof(T));
+S* precompute_w(uint n, S root, S root_inv, uint root_pw, bool invert) {
+  S* ws = (S*)malloc((n - 1) * sizeof(S));
   uint index = 0;
 
   for (int len = 2; len <= n; len <<= 1)
   {
-    T wlen = invert ? root_inv : root;
+    S wlen = invert ? root_inv : root;
     for (int i = len; i < root_pw; i <<= 1)
       wlen = wlen * wlen;
 
-    T w = T::from(1);
+    S w = S::from(1);
     for (int j = 0; j < len / 2; j++)
     {
       ws[index++] = w;
@@ -72,7 +72,7 @@ T* precompute_w(uint n, T root, T root_inv, uint root_pw, bool invert) {
   return ws;
 }
 
-void fft_cpu(T* b, uint n, T root, T root_inv, uint root_pw, T* ws, T* ws_inv, bool invert) {
+void fft_cpu(S* b, uint n, S root, S root_inv, uint root_pw, S* ws, S* ws_inv, bool invert) {
   const int log_n = log2(n);
   for (int i = 0; i < n; i++) {
     uint rev = reverse_bits(i);
@@ -80,7 +80,7 @@ void fft_cpu(T* b, uint n, T root, T root_inv, uint root_pw, T* ws, T* ws_inv, b
 
     if (i < rev) {
       // std::cout << "Swapping " << i << " " << rev << std::endl;
-      T tmp = b[i];
+      S tmp = b[i];
       b[i] = b[rev];
       b[rev] = tmp;
     }
@@ -94,15 +94,15 @@ void fft_cpu(T* b, uint n, T root, T root_inv, uint root_pw, T* ws, T* ws_inv, b
     {
       for (int j = 0; j < len / 2; j++)
       {
-        T w;
+        S w;
         if (!invert) {
           w = ws[ws_index + j];
         } else {
           w = ws_inv[ws_index + j];
         }
 
-        T u = b[i + j];
-        T v = b[i + j + len / 2] * w;
+        S u = b[i + j];
+        S v = b[i + j + len / 2] * w;
         b[i + j] = u + v;
         b[i + j + len / 2] = u - v;
       }
@@ -112,7 +112,7 @@ void fft_cpu(T* b, uint n, T root, T root_inv, uint root_pw, T* ws, T* ws_inv, b
   }
 
   if (invert) {
-    T inv_n = T::inverse(T::from(n));
+    S inv_n = S::inverse(S::from(n));
     for (int i = 0; i < n; i++) {
       b[i] = b[i] * inv_n;
     }
@@ -131,7 +131,7 @@ __device__ uint32_t device_reverse_bits(uint32_t x)
     return (x >> 16) | (x << 16);
 }
 
-__global__ void swap_bits(T* b, uint n, uint log_n) {
+__global__ void swap_bits(S* b, uint n, uint log_n) {
   uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
   for (int i = tid * 2; i < tid * 2 + 2; i++) {
@@ -139,24 +139,14 @@ __global__ void swap_bits(T* b, uint n, uint log_n) {
     rev = rev >> (32 - log_n);
 
     if (i < rev) {
-      T tmp = b[i];
+      S tmp = b[i];
       b[i] = b[rev];
       b[rev] = tmp;
     }
   }
 }
 
-__global__ void from_montgomery(T* b) {
-  uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
-  b[tid] = T::FromMontgomery(b[tid]);
-}
-
-__global__ void to_montgomery(T* b) {
-  uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
-  b[tid] = T::ToMontgomery(b[tid]);
-}
-
-__global__ void fft_kernel(T* b, uint n, T inv_n, uint pow, uint ws_index, T* ws, T* ws_inv, bool invert) {
+__global__ void fft_kernel(S* b, uint n, S inv_n, uint pow, uint ws_index, S* ws, S* ws_inv, bool invert) {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     int len = 1 << pow;
@@ -165,20 +155,20 @@ __global__ void fft_kernel(T* b, uint n, T inv_n, uint pow, uint ws_index, T* ws
     int i = q * len;
     int j = tid - q * len2;
 
-    T w;
+    S w;
     if (!invert) {
       w = ws[ws_index + j];
     } else {
       w = ws_inv[ws_index + j];
     }
 
-    T u = b[i + j];
-    T v = b[i + j + len / 2] * w;
+    S u = b[i + j];
+    S v = b[i + j + len / 2] * w;
     b[i + j] = u + v;
     b[i + j + len / 2] = u - v;
 }
 
-__global__ void invert_result(T* b, T inv_n) {
+__global__ void invert_result(S* b, S inv_n) {
   uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
   auto x = tid << 1;
@@ -186,23 +176,32 @@ __global__ void invert_result(T* b, T inv_n) {
   b[x + 1] = b[x + 1] * inv_n;
 }
 
-T* fft_gpu(T* host_b, uint n, T* device_ws, T* device_ws_inv, bool invert) {
-  cudaError_t err;
-  T* device_b;
+void print_runtime(std::string message, std::chrono::time_point< std::chrono::system_clock > start_time) {
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  std::cout << message << duration.count() << " microseconds" << std::endl;
+}
 
-  T inv_n = T::inverse(T::from(n));
+S* fft_gpu(S* host_b, uint n, S* device_ws, S* device_ws_inv, bool invert) {
+  cudaError_t err;
+  S* device_b;
+
+  S inv_n = S::inverse(S::from(n));
 
   auto start_time = std::chrono::high_resolution_clock::now();
 
   // allocate device array
-  cudaMalloc((void**)&device_b, n * sizeof(T));
+  cudaMalloc((void**)&device_b, n * sizeof(S));
 
   // copy from host to device
-  err = cudaMemcpy(device_b, host_b, n * sizeof(T), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(device_b, host_b, n * sizeof(S), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
+
+  print_runtime("memory allocation time: ", start_time);
+  start_time = std::chrono::high_resolution_clock::now();
 
   int cuda_device_ix = 0;
   cudaDeviceProp prop;
@@ -212,8 +211,6 @@ T* fft_gpu(T* host_b, uint n, T* device_ws, T* device_ws_inv, bool invert) {
   int worker_count = n >> 1;
   int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
   int num_blocks = (worker_count + num_threads - 1) / num_threads;
-
-  printf("GPU num_blocks = %d, num_threads = %d\n", num_blocks, num_threads);
 
   const int log_n = log2(n);
   // Swap bits
@@ -237,52 +234,54 @@ T* fft_gpu(T* host_b, uint n, T* device_ws, T* device_ws_inv, bool invert) {
     invert_result<<< num_blocks, num_threads  >>> (device_b, inv_n);
   }
 
-  T* host_result = (T*)malloc(n * sizeof(T));
-  err = cudaMemcpy(host_result, device_b, n * sizeof(T), cudaMemcpyDeviceToHost);
+  print_runtime("Kernel Running time: ", start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+
+
+  S* host_result = (S*)malloc(n * sizeof(S));
+  err = cudaMemcpy(host_result, device_b, n * sizeof(S), cudaMemcpyDeviceToHost);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from device to host - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
 
-  auto end_time = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-  std::cout << "GPU Kernel running time: " << duration.count() << " microseconds" << std::endl;
+  print_runtime("Copy back to host time: ", start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+
+  // printf("GPU num_blocks = %d, num_threads = %d\n", num_blocks, num_threads);
 
   return host_result;
 }
 
-T* run_gpu(std::vector<int> a) {
+S* run_gpu(std::vector<int> a) {
   cudaError_t err;
 
   const int log_n = log2(a.size());
   const int root_pw = 1 << log_n;
 
   int n = a.size();
-  T* a_field = (T*)malloc(n * sizeof(T));
+  S* a_field = (S*)malloc(n * sizeof(S));
   for (int i = 0; i < a.size(); i++) {
-    a_field[i] = T::from(a[i]);
+    a_field[i] = S::from(a[i]);
   }
 
-  T root = T::omega(log_n);
-  T root_inv = T::inverse(root);
+  S root = S::omega(log_n);
+  S root_inv = S::inverse(root);
 
-  std::cout << "root = " << root << std::endl;
-  std::cout << "root_inv = " << root_inv << std::endl;
+  S* ws = precompute_w(n, root, root_inv, root_pw, false);
+  S* ws_inv = precompute_w(n, root, root_inv, root_pw, true);
 
-  T* ws = precompute_w(n, root, root_inv, root_pw, false);
-  T* ws_inv = precompute_w(n, root, root_inv, root_pw, true);
-
-  T* device_ws;
-  T* device_ws_inv;
-  cudaMalloc((void**)&device_ws, n * sizeof(T));
-  cudaMalloc((void**)&device_ws_inv, n * sizeof(T));
+  S* device_ws;
+  S* device_ws_inv;
+  cudaMalloc((void**)&device_ws, n * sizeof(S));
+  cudaMalloc((void**)&device_ws_inv, n * sizeof(S));
   // copy from host to device
-  err = cudaMemcpy(device_ws, ws, n * sizeof(T), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(device_ws, ws, n * sizeof(S), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
     return NULL;
   }
-  err = cudaMemcpy(device_ws_inv, ws_inv, n * sizeof(T), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(device_ws_inv, ws_inv, n * sizeof(S), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     std::cerr << "Failed to copy data from host to device - " << cudaGetErrorString(err) << std::endl;
     return NULL;
@@ -299,27 +298,27 @@ T* run_gpu(std::vector<int> a) {
   return interpolate_result;
 }
 
-T* run_cpu(std::vector<int> a) {
+S* run_cpu(std::vector<int> a) {
   const int log_n = log2(a.size());
   const int root_pw = 1 << log_n;
 
   int n = a.size();
-  T* a_field = (T*)malloc(n * sizeof(T));
+  S* a_field = (S*)malloc(n * sizeof(S));
   for (int i = 0; i < a.size(); i++) {
-    a_field[i] = T::from(a[i]);
+    a_field[i] = S::from(a[i]);
   }
 
   std::cout << "n = " << n << " log_n = " << log_n << std::endl;
 
-  T root = T::omega(log_n);
-  T root_inv = T::inverse(root);
+  S root = S::omega(log_n);
+  S root_inv = S::inverse(root);
 
   std::cout << "root = " << root << std::endl;
   std::cout << "root_inv = " << root_inv << std::endl;
 
-  // (uint n, T root, T root_inv, uint root_pw, bool invert)
-  T* ws = precompute_w(n, root, root_inv, root_pw, false);
-  T* ws_inv = precompute_w(n, root, root_inv, root_pw, true);
+  // (uint n, S root, S root_inv, uint root_pw, bool invert)
+  S* ws = precompute_w(n, root, root_inv, root_pw, false);
+  S* ws_inv = precompute_w(n, root, root_inv, root_pw, true);
 
   std::cout << "Done precompute" << std::endl;
 
@@ -343,18 +342,14 @@ T* run_cpu(std::vector<int> a) {
   return a_field;
 }
 
-void test_montgomery(std::vector<int> a) {
-  auto tmp = T::ToMontgomery(T::from(a[0]));
-  std::cout << "To montgomery = " << tmp << std::endl;
+void run_gpu_multiple() {
 
-  auto tmp2 = T::FromMontgomery(tmp);
-  std::cout << "From montgomery = " << tmp2 << std::endl;
 }
 
 std::vector<int> gen_data() {
   // std::vector<int> a = {3, 1, 4, 1, 5, 9, 2, 6};
   std::vector<int> a;
-  for (int i = 0; i < 1 << 23; i++) {
+  for (int i = 0; i < 1 << 21; i++) {
     int random = rand() % 1000;
     a.push_back(random);
   }
@@ -367,7 +362,6 @@ int main(int argc, char** argv) {
 
   // auto cpu_result = run_cpu(a);
   auto gpu_result = run_gpu(a);
-  // test_montgomery(a);
 
   // for (int i = 0; i < a.size(); i++) {
   //   if (cpu_result[i] != gpu_result[i]) {
