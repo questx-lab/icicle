@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __FFT_H
-#define __FFT_H
+#ifndef __VIRGO_H
+#define __VIRGO_H
 
 #include <cstdint>
 #include <iostream>
@@ -10,9 +10,9 @@
 #include "utils/device_context.cuh"
 #include "utils/utils.h"
 
-namespace fft {
+namespace virgo {
   template <typename S>
-  cudaError_t fft(S* input, S* output, S* ws, int n, bool invert);
+  cudaError_t sumcheck_sum(S* arr1, S* arr2, S output, int n);
 }
 
 #endif

@@ -100,6 +100,7 @@ if (NOT BUILD_TESTS)
     list(APPEND ICICLE_SOURCES appUtils/poseidon/poseidon.cu)
     list(APPEND ICICLE_SOURCES appUtils/tree/merkle.cu)
     list(APPEND ICICLE_SOURCES appUtils/fft/fft.cu)
+    list(APPEND ICICLE_SOURCES appUtils/virgo/virgo.cu)
   endif()
 
   if (NOT CURVE IN_LIST SUPPORTED_CURVES_WITHOUT_NTT)

@@ -5,5 +5,6 @@ pub mod ntt;
 pub mod poseidon;
 pub mod tree;
 pub mod vec_ops;
+pub mod virgo;
 
 impl icicle_core::SNARKCurve for curve::CurveCfg {}
