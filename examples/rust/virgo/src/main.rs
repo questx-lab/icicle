@@ -1,6 +1,7 @@
 use icicle_core::traits::FieldImpl;
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
 use rand::Rng;
+use std::str::FromStr;
 use std::time::Instant;
 
 use ark_ff::PrimeField;
@@ -53,14 +54,14 @@ fn run_sumcheck_sum(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
         cpu_sum += arr1[i] * arr2[i];
     }
 
-    // assert_eq!(
-    //     IcicleFrBN254::from(
-    //         cpu_sum
-    //             .into_bigint()
-    //             .0,
-    //     ),
-    //     result[0]
-    // );
+    assert_eq!(
+        IcicleFrBN254::from(
+            cpu_sum
+                .into_bigint()
+                .0,
+        ),
+        result[0]
+    );
 
     println!("Test passed!");
 }
@@ -70,7 +71,7 @@ fn main() {
     let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
     let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
-    for _ in 0..n {
+    for i in 0..n {
         // let mut rng = StdRng::seed_from_u64(42);
         let mut rng = rand::thread_rng();
 
