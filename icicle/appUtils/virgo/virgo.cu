@@ -25,6 +25,63 @@ namespace virgo {
     }
   }
 
+    template <typename S>
+  __global__ void reduce_sum_kernel2(S** result, uint32_t arr_count, uint32_t n, uint32_t half) {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    uint32_t arr_id = tid % arr_count;
+    uint32_t arr_pos = tid / arr_count;
+
+    auto other = arr_pos + half;
+    if (other < n) {
+      result[arr_id][arr_pos] = result[arr_id][arr_pos] + result[arr_id][other];
+    }
+  }
+
+  template <typename S>
+  cudaError_t sum_arrays(S** arrs, int arr_count, int n)
+  {
+    int cuda_device_ix = 0;
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, cuda_device_ix);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    auto x = n;
+    while (x > 1) {
+      int worker_count = (x * arr_count) >> 1;
+      int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
+      int num_blocks = (worker_count + num_threads - 1) / num_threads;
+
+      int half = (x + 1) >> 1;
+      reduce_sum_kernel2 <<< num_blocks, num_threads, 0, stream >>> (arrs, arr_count, x, half);
+
+      x = (x + 1) >> 1;
+    }
+  }
+
+  template <typename S>
+  cudaError_t sum_single_array(S* arr, int n)
+  {
+    int cuda_device_ix = 0;
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, cuda_device_ix);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    auto x = n;
+    while (x > 1) {
+      int worker_count = x >> 1;
+      int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
+      int num_blocks = (worker_count + num_threads - 1) / num_threads;
+
+      int half = (x + 1) >> 1;
+      reduce_sum_kernel <<< num_blocks, num_threads, 0, stream >>> (arr, x, half);
+
+      x = (x + 1) >> 1;
+    }
+  }
+
   template <typename S>
   cudaError_t bk_sum_all_case1(
     S* arr1, S* arr2, S* output, int n)
@@ -43,7 +100,6 @@ namespace virgo {
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-
     S* device_tmp;
     // allocate device array
     cudaMalloc((void**)&device_tmp, n * sizeof(S));
@@ -56,17 +112,19 @@ namespace virgo {
 
     mul_pair_kernel <<< num_blocks, num_threads, 0, stream >>> (arr1, arr2, device_tmp, inv_r_mont2, n);
 
-    auto x = n;
-    while (x > 1) {
-      int worker_count = x >> 1;
-      int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
-      int num_blocks = (worker_count + num_threads - 1) / num_threads;
+    // auto x = n;
+    // while (x > 1) {
+    //   int worker_count = x >> 1;
+    //   int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
+    //   int num_blocks = (worker_count + num_threads - 1) / num_threads;
 
-      int half = (x + 1) >> 1;
-      reduce_sum_kernel <<< num_blocks, num_threads, 0, stream >>> (device_tmp, x, half);
+    //   int half = (x + 1) >> 1;
+    //   reduce_sum_kernel <<< num_blocks, num_threads, 0, stream >>> (device_tmp, x, half);
 
-      x = (x + 1) >> 1;
-    }
+    //   x = (x + 1) >> 1;
+    // }
+
+    sum_single_array(device_tmp, n);
 
     cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToHost);
 
