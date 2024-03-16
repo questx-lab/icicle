@@ -26,20 +26,21 @@ namespace virgo {
   }
 
     template <typename S>
-  __global__ void reduce_sum_kernel2(S** result, uint32_t arr_count, uint32_t n, uint32_t half) {
+  __global__ void reduce_sum_kernel2(S* result, uint32_t m, uint32_t n, uint32_t half, uint32_t offset) {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    uint32_t arr_id = tid % arr_count;
-    uint32_t arr_pos = tid / arr_count;
+    uint32_t arr_id = tid % m;
+    uint32_t arr_pos = tid / m;
 
     auto other = arr_pos + half;
     if (other < n) {
-      result[arr_id][arr_pos] = result[arr_id][arr_pos] + result[arr_id][other];
+      auto start = offset * arr_id + arr_pos;
+      result[start] = result[start] + result[start + half];
     }
   }
 
   template <typename S>
-  cudaError_t sum_arrays(S** arrs, int arr_count, int n)
+  cudaError_t sum_arrays(S* arrs, uint32_t m, uint32_t n)
   {
     int cuda_device_ix = 0;
     cudaDeviceProp prop;
@@ -49,12 +50,12 @@ namespace virgo {
 
     auto x = n;
     while (x > 1) {
-      int worker_count = (x * arr_count) >> 1;
+      int worker_count = (x * m + 1) >> 1;
       int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
       int num_blocks = (worker_count + num_threads - 1) / num_threads;
 
       int half = (x + 1) >> 1;
-      reduce_sum_kernel2 <<< num_blocks, num_threads, 0, stream >>> (arrs, arr_count, x, half);
+      reduce_sum_kernel2 <<< num_blocks, num_threads, 0, stream >>> (arrs, m, x, half, n);
 
       x = (x + 1) >> 1;
     }
@@ -112,21 +113,21 @@ namespace virgo {
 
     mul_pair_kernel <<< num_blocks, num_threads, 0, stream >>> (arr1, arr2, device_tmp, inv_r_mont2, n);
 
-    // auto x = n;
-    // while (x > 1) {
-    //   int worker_count = x >> 1;
-    //   int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
-    //   int num_blocks = (worker_count + num_threads - 1) / num_threads;
-
-    //   int half = (x + 1) >> 1;
-    //   reduce_sum_kernel <<< num_blocks, num_threads, 0, stream >>> (device_tmp, x, half);
-
-    //   x = (x + 1) >> 1;
-    // }
-
     sum_single_array(device_tmp, n);
-
     cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToHost);
+
+    // S* tmp2;
+    // cudaMalloc((void**)&tmp2, 2 * n * sizeof(S));
+    // cudaMemcpy(tmp2, device_tmp, n * sizeof(S), cudaMemcpyHostToHost);
+    // cudaMemcpy(tmp2 + n, device_tmp, n * sizeof(S), cudaMemcpyHostToHost);
+
+    // sum_arrays(tmp2, 2, n);
+
+    // cudaMemcpy(output, tmp2, sizeof(S), cudaMemcpyDeviceToHost);
+    // std::cout << "output 0 = " << output << std::endl;
+
+    // cudaMemcpy(output, tmp2 + n, sizeof(S), cudaMemcpyDeviceToHost);
+    // std::cout << "output 1 = " << output << std::endl;
 
     cudaFree(device_tmp);
 

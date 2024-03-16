@@ -67,7 +67,7 @@ fn run_bk_sum_all_case1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
 }
 
 fn main() {
-    let n = 1 << 16;
+    let n = 1 << 20;
     let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
     let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
