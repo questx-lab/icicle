@@ -26,7 +26,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t sumcheck_sum(
+  cudaError_t bk_sum_all_case1(
     S* arr1, S* arr2, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
@@ -51,7 +51,7 @@ namespace virgo {
     // This is arkwork inverse R, not icicle inverse R.
     // inv_r = 9915499612839321149637521777990102151350674507940716049588462388200839649614
     // S inv_r_mont({0x6db1194e, 0xdc5ba005, 0xe111ec87, 0x90ef5a9, 0xaeb85d5d, 0xc8260de4, 0x82c5551c, 0x15ebf951});
-    // inv_r2 = 8519677608991584271437967308266649112183478179623991153221810821821888926024
+    // inv_r2 = inv_r ^ 2 = 8519677608991584271437967308266649112183478179623991153221810821821888926024
     S inv_r_mont2({0xd3c71148, 0xae12ba81, 0xb38e2428, 0x52f28270, 0x79a1edeb, 0xe065f3e3, 0xe436631e, 0x12d5f775});
 
     mul_pair_kernel <<< num_blocks, num_threads, 0, stream >>> (arr1, arr2, device_tmp, inv_r_mont2, n);
@@ -75,12 +75,12 @@ namespace virgo {
     return CHK_LAST();
   }
 
-  extern "C" cudaError_t CONCAT_EXPAND(CURVE, SumcheckSum)(
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase1)(
     curve_config::scalar_t* arr1,
     curve_config::scalar_t* arr2,
     curve_config::scalar_t* output,
     int n)
   {
-    return sumcheck_sum<curve_config::scalar_t>(arr1, arr2, output, n);
+    return bk_sum_all_case1<curve_config::scalar_t>(arr1, arr2, output, n);
   }
 }

@@ -7,10 +7,10 @@ use std::time::Instant;
 use ark_ff::PrimeField;
 use ark_std::cfg_into_iter;
 use icicle_bn254::curve::ScalarField as IcicleFrBN254;
-use icicle_core::virgo::sumcheck_sum;
+use icicle_core::virgo::bk_sum_all_case1;
 pub type ArkFrBN254 = ark_bn254::Fr;
 
-fn run_sumcheck_sum(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
+fn run_bk_sum_all_case1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
     let n = arr1.len();
     let mut a_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
     let mut b_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
@@ -39,7 +39,7 @@ fn run_sumcheck_sum(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
 
     println!("START running on GPU");
     let start = Instant::now();
-    _ = sumcheck_sum(&a_slice, &b_slice, &mut result_slice, n as u32);
+    _ = bk_sum_all_case1(&a_slice, &b_slice, &mut result_slice, n as u32);
     println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
     let start = Instant::now();
 
@@ -82,5 +82,5 @@ fn main() {
         b.push(ArkFrBN254::from(num));
     }
 
-    run_sumcheck_sum(a, b);
+    run_bk_sum_all_case1(a, b);
 }
