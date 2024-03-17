@@ -13,6 +13,9 @@
 namespace virgo {
   template <typename S>
   cudaError_t bk_sum_all_case1(S* arr1, S* arr2, S output, int n);
+
+  template <typename S>
+  cudaError_t bk_sum_all_case2(S* arr, S output, int n);
 }
 
 #endif

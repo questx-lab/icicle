@@ -12,16 +12,20 @@ namespace virgo {
   // inv_r = 9915499612839321149637521777990102151350674507940716049588462388200839649614
   // inv_r2 = inv_r ^ 2 = 8519677608991584271437967308266649112183478179623991153221810821821888926024
   template <typename S>
-  constexpr S inv_r_mont = S({0x6db1194e, 0xdc5ba005, 0xe111ec87, 0x90ef5a9, 0xaeb85d5d, 0xc8260de4, 0x82c5551c, 0x15ebf951});
+  __device__ constexpr S inv_r_mont = S({0x6db1194e, 0xdc5ba005, 0xe111ec87, 0x90ef5a9, 0xaeb85d5d, 0xc8260de4, 0x82c5551c, 0x15ebf951});
 
   template <typename S>
-  constexpr S inv_r_mont2 = S({0xd3c71148, 0xae12ba81, 0xb38e2428, 0x52f28270, 0x79a1edeb, 0xe065f3e3, 0xe436631e, 0x12d5f775});
+  __device__ constexpr S inv_r_mont2 = S({0xd3c71148, 0xae12ba81, 0xb38e2428, 0x52f28270, 0x79a1edeb, 0xe065f3e3, 0xe436631e, 0x12d5f775});
+
+  /////////////////////////////////
+  /// DEVICE FUNCTIONS
+  /////////////////////////////////
 
   template <typename S>
-    __global__ void mul_pair_kernel(S* arr1, S* arr2, S* result, S inv_r_mont2, int n) {
+  __global__ void mul_pair_kernel(S* arr1, S* arr2, S* result, int n) {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    result[tid] = arr1[tid] * arr2[tid] * inv_r_mont2;
+    result[tid] = arr1[tid] * arr2[tid] * (inv_r_mont<S>);
   }
 
   template <typename S>
@@ -92,6 +96,24 @@ namespace virgo {
     }
   }
 
+  /////////////////////////////////
+  /// BookKeeping sum_all
+  /////////////////////////////////
+
+  template <typename S>
+  void print_arr(S* arr, int start, int end) {
+    int len = end - start;
+    S* tmp = (S*)malloc(len * sizeof(S));
+
+    cudaMemcpy(tmp, arr + start, len * sizeof(S), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < len; i++) {
+      std::cout << tmp[i] * inv_r_mont<S> << " ";
+    }
+    std::cout << std::endl;
+
+    delete [] tmp;
+  }
+
   template <typename S>
   cudaError_t bk_sum_all_case1(
     S* arr1, S* arr2, S* output, int n)
@@ -102,10 +124,6 @@ namespace virgo {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, cuda_device_ix);
 
-    const int log_n = log2(n);
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-
     S* device_tmp;
     // allocate device array
     cudaMalloc((void**)&device_tmp, n * sizeof(S));
@@ -115,26 +133,26 @@ namespace virgo {
     int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
     int num_blocks = (worker_count + num_threads - 1) / num_threads;
 
-    mul_pair_kernel <<< num_blocks, num_threads, 0, stream >>> (arr1, arr2, device_tmp, inv_r_mont2<S>, n);
+    mul_pair_kernel <<< num_blocks, num_threads >>> (arr1, arr2, device_tmp, n);
 
     // 2. Sum up all the values in the array.
     sum_single_array(device_tmp, n);
-    cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToHost);
-
-    // S* tmp2;
-    // cudaMalloc((void**)&tmp2, 2 * n * sizeof(S));
-    // cudaMemcpy(tmp2, device_tmp, n * sizeof(S), cudaMemcpyHostToHost);
-    // cudaMemcpy(tmp2 + n, device_tmp, n * sizeof(S), cudaMemcpyHostToHost);
-
-    // sum_arrays(tmp2, 2, n);
-
-    // cudaMemcpy(output, tmp2, sizeof(S), cudaMemcpyDeviceToHost);
-    // std::cout << "output 0 = " << output << std::endl;
-
-    // cudaMemcpy(output, tmp2 + n, sizeof(S), cudaMemcpyDeviceToHost);
-    // std::cout << "output 1 = " << output << std::endl;
+    cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyHostToHost);
 
     cudaFree(device_tmp);
+
+    return CHK_LAST();
+  }
+
+  template <typename S>
+  cudaError_t bk_sum_all_case2(
+    S* arr, S* output, int n)
+  {
+    CHK_INIT_IF_RETURN();
+
+    // Sum up all the values in the array.
+    sum_single_array(arr, n);
+    cudaMemcpy(output, arr, sizeof(S), cudaMemcpyHostToHost);
 
     return CHK_LAST();
   }
@@ -146,5 +164,13 @@ namespace virgo {
     int n)
   {
     return bk_sum_all_case1<curve_config::scalar_t>(arr1, arr2, output, n);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase2)(
+    curve_config::scalar_t* arr,
+    curve_config::scalar_t* output,
+    int n)
+  {
+    return bk_sum_all_case2<curve_config::scalar_t>(arr, output, n);
   }
 }
