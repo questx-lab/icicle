@@ -5,8 +5,8 @@ use ark_std::cfg_into_iter;
 
 use icicle_bn254::curve::ScalarField as IcicleFrBN254;
 use icicle_core::traits::FieldImpl;
-use icicle_core::virgo::bk_sum_all_case1;
-use icicle_core::virgo::bk_sum_all_case2;
+use icicle_core::virgo::bk_sum_all_case_1;
+use icicle_core::virgo::bk_sum_all_case_2;
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -16,7 +16,7 @@ use std::time::Instant;
 
 pub type ArkFrBN254 = ark_bn254::Fr;
 
-fn run_bk_sum_all_case1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
+fn run_bk_sum_all_case_1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
     let n = arr1.len();
     let mut a_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
     let mut b_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
@@ -44,7 +44,7 @@ fn run_bk_sum_all_case1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
 
     println!("START running on GPU");
     let start = Instant::now();
-    _ = bk_sum_all_case1(&a_slice, &b_slice, &mut result_slice, n as u32);
+    _ = bk_sum_all_case_1(&a_slice, &b_slice, &mut result_slice, n as u32);
     println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
     let start = Instant::now();
 
@@ -67,7 +67,7 @@ fn run_bk_sum_all_case1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
 }
 
 // Bookkeeping sum_all test 2
-fn run_bk_sum_all_case2(arr: Vec<ArkFrBN254>) {
+fn run_bk_sum_all_case_2(arr: Vec<ArkFrBN254>) {
     let n = arr.len();
     let mut a_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
 
@@ -88,7 +88,7 @@ fn run_bk_sum_all_case2(arr: Vec<ArkFrBN254>) {
 
     println!("START running on GPU");
     let start = Instant::now();
-    _ = bk_sum_all_case2(&a_slice, &mut result_slice, n as u32);
+    _ = bk_sum_all_case_2(&a_slice, &mut result_slice, n as u32);
     println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
     let start = Instant::now();
 
@@ -126,6 +126,6 @@ fn main() {
         b.push(ArkFrBN254::from(num));
     }
 
-    run_bk_sum_all_case1(a, b);
-    // run_bk_sum_all_case2(a);
+    run_bk_sum_all_case_1(a, b);
+    // run_bk_sum_all_case_2(a);
 }

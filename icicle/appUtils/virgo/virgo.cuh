@@ -8,14 +8,15 @@
 #include "curves/curve_config.cuh"
 #include "utils/error_handler.cuh"
 #include "utils/device_context.cuh"
+
 #include "utils/utils.h"
 
 namespace virgo {
   template <typename S>
-  cudaError_t bk_sum_all_case1(S* arr1, S* arr2, S output, int n);
+  cudaError_t bk_sum_all_case_1(S* arr1, S* arr2, S output, int n);
 
   template <typename S>
-  cudaError_t bk_sum_all_case2(S* arr, S output, int n);
+  cudaError_t bk_sum_all_case_2(S* arr, S output, int n);
 }
 
 #endif
