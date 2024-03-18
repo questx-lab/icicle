@@ -6,6 +6,7 @@ use ark_std::cfg_into_iter;
 use icicle_bn254::curve::ScalarField as IcicleFrBN254;
 use icicle_core::traits::FieldImpl;
 use icicle_core::virgo::bk_produce_case_1;
+use icicle_core::virgo::bk_produce_case_2;
 use icicle_core::virgo::bk_sum_all_case_1;
 use icicle_core::virgo::bk_sum_all_case_2;
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
@@ -115,26 +116,48 @@ fn run_bk_produce_case_1(arr1: Vec<ArkFrBN254>, arr2: Vec<ArkFrBN254>) {
     let result = icicles_to_arks(result_slice, 3);
 
     // double check with the result on cpu
-    let mut cpu_sum0 = ArkFrBN254::from(0u128);
-    let mut cpu_sum1 = ArkFrBN254::from(0u128);
-    let mut cpu_sum2 = ArkFrBN254::from(0u128);
+    let mut cpu_sum = vec![ArkFrBN254::from(0u128); 3];
     let two = ArkFrBN254::from(2u128);
     for i0 in (0..n).step_by(2) {
         let i1 = i0 + 1;
-        cpu_sum0 += arr1[i0] * arr2[i0];
-        cpu_sum1 += arr1[i1] * arr2[i1];
-        cpu_sum2 += (two * arr1[i1] - arr1[i0]) * (two * arr2[i1] - arr2[i0]);
+        cpu_sum[0] += arr1[i0] * arr2[i0];
+        cpu_sum[1] += arr1[i1] * arr2[i1];
+        cpu_sum[2] += (two * arr1[i1] - arr1[i0]) * (two * arr2[i1] - arr2[i0]);
     }
 
-    assert_eq!(cpu_sum0, result[0]);
-    assert_eq!(cpu_sum1, result[1]);
-    assert_eq!(cpu_sum2, result[2]);
+    assert_eq!(cpu_sum, result);
+
+    println!("Test passed!");
+}
+
+fn run_bk_produce_case_2(arr: Vec<ArkFrBN254>) {
+    let n = arr.len();
+    let start = Instant::now();
+    let mut a_slice = arks_to_icicles(&arr);
+    let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
+    println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
+
+    _ = bk_produce_case_2(&a_slice, &mut result_slice, n as u32);
+
+    let result = icicles_to_arks(result_slice, 3);
+
+    // double check with the result on cpu
+    let mut cpu_sum = vec![ArkFrBN254::from(0u128); 3];
+    let two = ArkFrBN254::from(2u128);
+    for i0 in (0..n).step_by(2) {
+        let i1 = i0 + 1;
+        cpu_sum[0] += arr[i0];
+        cpu_sum[1] += arr[i1];
+        cpu_sum[2] += two * arr[i1] - arr[i0];
+    }
+
+    assert_eq!(cpu_sum, result);
 
     println!("Test passed!");
 }
 
 fn main() {
-    let n = 1 << 23;
+    let n = 1 << 20;
     let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
     let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
@@ -155,5 +178,6 @@ fn main() {
 
     // run_bk_sum_all_case_1(a, b);
     // run_bk_sum_all_case_2(a);
-    run_bk_produce_case_1(a, b);
+    // run_bk_produce_case_1(a, b);
+    run_bk_produce_case_2(a);
 }

@@ -18,6 +18,8 @@ pub trait Virgo<F: FieldImpl> {
         result: &mut HostOrDeviceSlice<F>,
         n: u32,
     ) -> IcicleResult<()>;
+
+    fn bk_produce_case_2(table: &HostOrDeviceSlice<F>, result: &mut HostOrDeviceSlice<F>, n: u32) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -52,6 +54,14 @@ where
     <F as FieldImpl>::Config: Virgo<F>,
 {
     <<F as FieldImpl>::Config as Virgo<F>>::bk_produce_case_1(table1, table2, result, n)
+}
+
+pub fn bk_produce_case_2<F>(table: &HostOrDeviceSlice<F>, result: &mut HostOrDeviceSlice<F>, n: u32) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::bk_produce_case_2(table, result, n)
 }
 
 #[macro_export]
@@ -89,6 +99,11 @@ macro_rules! impl_virgo {
                     n: u32,
                 ) -> CudaError;
             }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "BkProduceCase2")]
+                pub(crate) fn _bk_produce_case_2(arr: *const $field, result: *mut $field, n: u32) -> CudaError;
+            }
         }
 
         impl Virgo<$field> for $field_config {
@@ -122,6 +137,14 @@ macro_rules! impl_virgo {
                     $field_prefix_ident::_bk_produce_case_1(table1.as_ptr(), table2.as_ptr(), result.as_mut_ptr(), n)
                         .wrap()
                 }
+            }
+
+            fn bk_produce_case_2(
+                table: &HostOrDeviceSlice<$field>,
+                result: &mut HostOrDeviceSlice<$field>,
+                n: u32,
+            ) -> IcicleResult<()> {
+                unsafe { $field_prefix_ident::_bk_produce_case_2(table.as_ptr(), result.as_mut_ptr(), n).wrap() }
             }
         }
     };

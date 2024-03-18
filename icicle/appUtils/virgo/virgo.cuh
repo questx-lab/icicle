@@ -20,6 +20,9 @@ namespace virgo {
 
   template <typename S>
   cudaError_t bk_produce_case_1(S* arr1, S* arr2, S output, int n);
+
+  template <typename S>
+  cudaError_t bk_produce_case_2(S* arr1, S* arr2, S output, int n);
 }
 
 #endif

@@ -27,4 +27,12 @@ namespace virgo {
   {
     return bk_produce_case_1<curve_config::scalar_t>(table1, table2, output, n);
   }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkProduceCase2)(
+    curve_config::scalar_t* table,
+    curve_config::scalar_t* output,
+    int n)
+  {
+    return bk_produce_case_2<curve_config::scalar_t>(table, output, n);
+  }
 }

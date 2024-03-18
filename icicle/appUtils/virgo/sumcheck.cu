@@ -197,8 +197,6 @@ namespace virgo {
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
     // If we set num_threads = 1024 (max thread), we would get "too many resources requested for launch"
     // https://stackoverflow.com/a/29901673
     // We work around this by reducing the number of thread per block and increasing num_blocks.
@@ -223,6 +221,79 @@ namespace virgo {
     auto end1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
     std::cout << "bk_produce_case_1, GPU Duration = " << duration1.count() << std::endl;
+
+    return CHK_LAST();
+  }
+
+  template <typename S>
+  __global__ void bk_produce_case_2_multiply(S* table, S* output, int n) {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    auto half_n = n >> 1;
+    if (tid >= half_n * 3) {
+      return;
+    }
+
+    S result;
+    // auto pid = tid / half_n;
+    auto pid = tid / half_n;
+    auto output_index = tid % half_n;
+    auto i0 = output_index * 2;
+    auto i1 = i0 + 1;
+
+    if (pid == 0) {
+      // result.0 += a10;
+      output[output_index] = table[i0];
+    } else if (pid == 1) {
+      // result.1 += a11;
+      output[n / 2 + output_index] = table[i1];
+    } else {
+      // result.2 += *a11 + a11 - a10;
+      S two = S::from(2);
+      output[n + output_index] = two * table[i1] - table[i0];
+    }
+  }
+
+  template <typename S>
+  cudaError_t bk_produce_case_2(
+    S* table, S* output, int n)
+  {
+    CHK_INIT_IF_RETURN();
+    auto start = std::chrono::high_resolution_clock::now();
+
+    auto half_n = n / 2;
+    auto sum_len = 3 * half_n;
+
+    S* device_tmp;
+    // allocate device array
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, sum_len * sizeof(S)));
+
+    // Step 1. Multiply
+    auto [num_blocks, num_threads] = find_thread_block(sum_len);
+    // // If we set num_threads = 1024 (max thread), we would get "too many resources requested for launch"
+    // // https://stackoverflow.com/a/29901673
+    // // We work around this by reducing the number of thread per block and increasing num_blocks.
+    // if (num_threads == 1024) {
+    //   num_threads /= 2;
+    //   num_blocks *= 2;
+    // }
+    bk_produce_case_2_multiply <<< num_blocks, num_threads >>> (table, device_tmp, n);
+
+    auto err2 = CHK_LAST();
+
+    // Step 2. Sum up.
+    // sum_single_array(device_tmp, n / 2);
+    sum_arrays(device_tmp, 3, half_n);
+
+    cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyHostToHost);
+    cudaMemcpy(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyHostToHost);
+    cudaMemcpy(output + 2, device_tmp + n, sizeof(S), cudaMemcpyHostToHost);
+
+    cudaFree(device_tmp);
+
+    auto end1 = std::chrono::high_resolution_clock::now();
+    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
+    std::cout << "bk_produce_case_2, GPU Duration = " << duration1.count() << std::endl;
 
     return CHK_LAST();
   }
