@@ -114,8 +114,7 @@ namespace virgo {
   /////////////////////////////////
 
   template <typename S>
-  cudaError_t bk_sum_all_case_1(
-    S* table1, S* table2, S* output, int n)
+  cudaError_t bk_sum_all_case_1(const VirgoConfig& config, S* table1, S* table2, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
 
@@ -136,13 +135,13 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_sum_all_case_2(
-    S* arr, S* output, int n)
+  cudaError_t bk_sum_all_case_2(const VirgoConfig& config, S* arr, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
 
     // Sum up all the values in the array.
     sum_single_array(arr, n);
+
     cudaMemcpy(output, arr, sizeof(S), cudaMemcpyHostToHost);
 
     return CHK_LAST();
@@ -182,8 +181,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_produce_case_1(
-    S* table1, S* table2, S* output, int n)
+  cudaError_t bk_produce_case_1(const VirgoConfig& config, S* table1, S* table2, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
     auto start = std::chrono::high_resolution_clock::now();
@@ -255,8 +253,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_produce_case_2(
-    S* table, S* output, int n)
+  cudaError_t bk_produce_case_2(const VirgoConfig& config, S* table, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
     auto start = std::chrono::high_resolution_clock::now();
@@ -270,13 +267,6 @@ namespace virgo {
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    // // If we set num_threads = 1024 (max thread), we would get "too many resources requested for launch"
-    // // https://stackoverflow.com/a/29901673
-    // // We work around this by reducing the number of thread per block and increasing num_blocks.
-    // if (num_threads == 1024) {
-    //   num_threads /= 2;
-    //   num_blocks *= 2;
-    // }
     bk_produce_case_2_multiply <<< num_blocks, num_threads >>> (table, device_tmp, n);
 
     auto err2 = CHK_LAST();
@@ -292,8 +282,8 @@ namespace virgo {
     cudaFree(device_tmp);
 
     auto end1 = std::chrono::high_resolution_clock::now();
-    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
-    std::cout << "bk_produce_case_2, GPU Duration = " << duration1.count() << std::endl;
+    auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start);
+    std::cout << "bk_produce_case_2, GPU Duration (ms) = " << duration1.count() << std::endl;
 
     return CHK_LAST();
   }

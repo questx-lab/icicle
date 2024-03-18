@@ -12,8 +12,12 @@
 #include "utils/utils.h"
 
 namespace virgo {
+  struct VirgoConfig {
+    device_context::DeviceContext ctx;
+  };
+
   template <typename S>
-  cudaError_t bk_sum_all_case_1(S* arr1, S* arr2, S output, int n);
+  cudaError_t bk_sum_all_case_1(const VirgoConfig& config, S* arr1, S* arr2, S output, int n);
 
   template <typename S>
   cudaError_t bk_sum_all_case_2(S* arr, S output, int n);
