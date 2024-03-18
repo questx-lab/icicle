@@ -17,16 +17,11 @@ namespace virgo {
   };
 
   template <typename S>
-  cudaError_t bk_sum_all_case_1(const VirgoConfig& config, S* arr1, S* arr2, S output, int n);
-
-  template <typename S>
-  cudaError_t bk_sum_all_case_2(S* arr, S output, int n);
-
-  template <typename S>
-  cudaError_t bk_produce_case_1(S* arr1, S* arr2, S output, int n);
-
-  template <typename S>
-  cudaError_t bk_produce_case_2(S* arr1, S* arr2, S output, int n);
+  struct MerkleTreeConfig {
+    uint32_t D[8];
+    uint32_t MAX_MIMC_K;
+    S* mimc_params;
+  };
 }
 
 #endif

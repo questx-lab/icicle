@@ -67,7 +67,7 @@ namespace virgo {
     }
   }
 
-    template <typename S>
+  template <typename S>
   __global__ void reduce_sum_kernel2(S* result, uint32_t m, uint32_t n, uint32_t half, uint32_t offset) {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -207,7 +207,6 @@ namespace virgo {
     auto err2 = CHK_LAST();
 
     // Step 2. Sum up.
-    // sum_single_array(device_tmp, n / 2);
     sum_arrays(device_tmp, 3, half_n);
 
     cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyHostToHost);

@@ -1,5 +1,6 @@
 #include "virgo.cuh"
 #include "sumcheck.cu"
+#include "merkle_tree.cu"
 
 namespace virgo {
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase1)(
@@ -38,5 +39,14 @@ namespace virgo {
     int n)
   {
     return bk_produce_case_2<curve_config::scalar_t>(config, table, output, n);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, BuildMerkleTree)(
+    const MerkleTreeConfig<curve_config::scalar_t> &config,
+    curve_config::scalar_t* table,
+    curve_config::scalar_t* output,
+    int n)
+  {
+    return build_merkle_tree<curve_config::scalar_t>(config, table, output, n);
   }
 }
