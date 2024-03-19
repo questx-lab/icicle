@@ -4,7 +4,7 @@
 
 namespace virgo {
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase1)(
-    const VirgoConfig &config,
+    const SumcheckConfig &config,
     curve_config::scalar_t* arr1,
     curve_config::scalar_t* arr2,
     curve_config::scalar_t* output,
@@ -14,7 +14,7 @@ namespace virgo {
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase2)(
-    const VirgoConfig &config,
+    const SumcheckConfig &config,
     curve_config::scalar_t* arr,
     curve_config::scalar_t* output,
     int n)
@@ -23,7 +23,7 @@ namespace virgo {
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkProduceCase1)(
-    const VirgoConfig &config,
+    const SumcheckConfig &config,
     curve_config::scalar_t* table1,
     curve_config::scalar_t* table2,
     curve_config::scalar_t* output,
@@ -33,7 +33,7 @@ namespace virgo {
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkProduceCase2)(
-    const VirgoConfig &config,
+    const SumcheckConfig &config,
     curve_config::scalar_t* table,
     curve_config::scalar_t* output,
     int n)

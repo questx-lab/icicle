@@ -12,7 +12,7 @@
 #include "utils/utils.h"
 
 namespace virgo {
-  struct VirgoConfig {
+  struct SumcheckConfig {
     device_context::DeviceContext ctx;
   };
 

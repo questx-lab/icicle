@@ -11,7 +11,7 @@ mod test {
     use icicle_core::virgo::bk_produce_case_2;
     use icicle_core::virgo::bk_sum_all_case_1;
     use icicle_core::virgo::bk_sum_all_case_2;
-    use icicle_core::virgo::VirgoConfig;
+    use icicle_core::virgo::SumcheckConfig;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice::Device;
     use rand::rngs::StdRng;
@@ -83,7 +83,13 @@ mod test {
 
         println!("START running on GPU");
         let start = Instant::now();
-        _ = bk_sum_all_case_1(&VirgoConfig::default(), &a_slice, &b_slice, &mut result_slice, n as u32);
+        _ = bk_sum_all_case_1(
+            &SumcheckConfig::default(),
+            &a_slice,
+            &b_slice,
+            &mut result_slice,
+            n as u32,
+        );
         println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
         let start = Instant::now();
 
@@ -116,7 +122,7 @@ mod test {
 
         println!("START running on GPU");
         let start = Instant::now();
-        _ = bk_sum_all_case_2(&VirgoConfig::default(), &a_slice, &mut result_slice, n as u32);
+        _ = bk_sum_all_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32);
         println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
         let start = Instant::now();
 
@@ -143,7 +149,13 @@ mod test {
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
-        _ = bk_produce_case_1(&VirgoConfig::default(), &a_slice, &b_slice, &mut result_slice, n as u32);
+        _ = bk_produce_case_1(
+            &SumcheckConfig::default(),
+            &a_slice,
+            &b_slice,
+            &mut result_slice,
+            n as u32,
+        );
 
         let result = icicles_to_arks(result_slice, 3);
 
@@ -171,7 +183,7 @@ mod test {
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
-        _ = bk_produce_case_2(&VirgoConfig::default(), &a_slice, &mut result_slice, n as u32);
+        _ = bk_produce_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32);
 
         let result = icicles_to_arks(result_slice, 3);
 

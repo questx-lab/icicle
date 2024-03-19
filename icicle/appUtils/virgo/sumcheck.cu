@@ -114,7 +114,7 @@ namespace virgo {
   /////////////////////////////////
 
   template <typename S>
-  cudaError_t bk_sum_all_case_1(const VirgoConfig& config, S* table1, S* table2, S* output, int n)
+  cudaError_t bk_sum_all_case_1(const SumcheckConfig& config, S* table1, S* table2, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
 
@@ -135,7 +135,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_sum_all_case_2(const VirgoConfig& config, S* arr, S* output, int n)
+  cudaError_t bk_sum_all_case_2(const SumcheckConfig& config, S* arr, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
 
@@ -181,7 +181,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_produce_case_1(const VirgoConfig& config, S* table1, S* table2, S* output, int n)
+  cudaError_t bk_produce_case_1(const SumcheckConfig& config, S* table1, S* table2, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
     auto start = std::chrono::high_resolution_clock::now();
@@ -252,7 +252,7 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t bk_produce_case_2(const VirgoConfig& config, S* table, S* output, int n)
+  cudaError_t bk_produce_case_2(const SumcheckConfig& config, S* table, S* output, int n)
   {
     CHK_INIT_IF_RETURN();
     auto start = std::chrono::high_resolution_clock::now();
