@@ -3,13 +3,9 @@ mod test {
     use crate::constant::ArkFrBN254;
     use crate::constant::D;
     use crate::constant::K_BN254;
-    use crate::constant::MAX_MIMC_K;
 
     use ark_ff::BigInt;
-    use ark_ff::Field;
     use ark_ff::Fp;
-    use ark_ff::PrimeField;
-    use ark_ff::UniformRand;
     use ark_std::cfg_into_iter;
 
     use icicle_bn254::curve::ScalarField as IcicleFrBN254;
@@ -22,7 +18,6 @@ mod test {
     use icicle_core::virgo::MerkleTreeConfig;
     use icicle_core::virgo::SumcheckConfig;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice;
-    use icicle_cuda_runtime::memory::HostOrDeviceSlice::Device;
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
@@ -35,7 +30,7 @@ mod test {
         let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
         let mut rng = StdRng::seed_from_u64(42);
-        for i in 0..n {
+        for _ in 0..n {
             let num = rng.gen_range(0..10);
             a.push(ArkFrBN254::from(num));
 
@@ -92,8 +87,8 @@ mod test {
     fn test_bk_sum_all_case_1() {
         let (arr1, arr2) = gen_input();
         let n = arr1.len();
-        let mut a_slice = arks_to_icicles_device(&arr1);
-        let mut b_slice = arks_to_icicles_device(&arr2);
+        let a_slice = arks_to_icicles_device(&arr1);
+        let b_slice = arks_to_icicles_device(&arr2);
 
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
 
@@ -107,7 +102,6 @@ mod test {
             n as u32,
         );
         println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
-        let start = Instant::now();
 
         let mut result_mont = vec![IcicleFrBN254::zero(); 1];
         result_slice
@@ -132,7 +126,7 @@ mod test {
     fn test_bk_sum_all_case_2() {
         let arr = gen_input().0;
         let n = arr.len();
-        let mut a_slice = arks_to_icicles_device(&arr);
+        let a_slice = arks_to_icicles_device(&arr);
 
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
 
@@ -140,7 +134,6 @@ mod test {
         let start = Instant::now();
         _ = bk_sum_all_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32);
         println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
-        let start = Instant::now();
 
         let result = icicles_to_arks(&result_slice, 1)[0];
 
@@ -160,8 +153,8 @@ mod test {
         let (arr1, arr2) = gen_input();
         let n = arr1.len();
         let start = Instant::now();
-        let mut a_slice = arks_to_icicles_device(&arr1);
-        let mut b_slice = arks_to_icicles_device(&arr2);
+        let a_slice = arks_to_icicles_device(&arr1);
+        let b_slice = arks_to_icicles_device(&arr2);
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
@@ -195,7 +188,7 @@ mod test {
         let arr = gen_input().0;
         let n = arr.len();
         let start = Instant::now();
-        let mut a_slice = arks_to_icicles_device(&arr);
+        let a_slice = arks_to_icicles_device(&arr);
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
@@ -232,10 +225,9 @@ mod test {
 
         let device_d = u32s_to_device(&D.to_vec());
         let device_params = arks_to_icicles_device(&params);
-        let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
+        let device_config = MerkleTreeConfig::default_for_device(&device_params, &device_d);
 
-        let start = Instant::now();
-        build_merkle_tree(&device_config, &mut tree_slice, n as u32);
+        build_merkle_tree(&device_config, &mut tree_slice, n as u32).unwrap();
 
         tree_slice
     }
@@ -248,13 +240,14 @@ mod test {
         let mut ice_values = vec![IcicleFrBN254::zero(); 1];
         let mut ice_result = vec![];
 
-        let start = Instant::now();
         let mut x_n = n;
         let mut x_index = index;
         let mut offset = 0;
         let mut leave_value = ArkFrBN254::from(0u128);
         loop {
-            tree_slice.copy_to_host_at_index(&mut ice_values, 0, offset + x_index);
+            tree_slice
+                .copy_to_host_at_index(&mut ice_values, 0, offset + x_index)
+                .unwrap();
             let result: Vec<ArkFrBN254> = ice_values
                 .iter()
                 .map(|x| Fp(BigInt(x.limbs), std::marker::PhantomData))

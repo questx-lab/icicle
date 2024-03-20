@@ -2,9 +2,6 @@ use icicle_cuda_runtime::device_context::{DeviceContext, DEFAULT_DEVICE_ID};
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
 
 use crate::{error::IcicleResult, traits::FieldImpl};
-use rand::rngs::StdRng;
-use rand::Rng;
-use rand::SeedableRng;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -40,7 +37,7 @@ pub struct MerkleTreeConfig<'a, F: FieldImpl> {
 }
 
 impl<'a, F: FieldImpl> MerkleTreeConfig<'a, F> {
-    pub fn default_for_device(mimc_params: &HostOrDeviceSlice<F>, max_mimc_k: u32, d: &HostOrDeviceSlice<u32>) -> Self {
+    pub fn default_for_device(mimc_params: &HostOrDeviceSlice<F>, d: &HostOrDeviceSlice<u32>) -> Self {
         Self {
             ctx: DeviceContext::default_for_device(DEFAULT_DEVICE_ID),
             max_mimc_k: mimc_params.len() as u32,
