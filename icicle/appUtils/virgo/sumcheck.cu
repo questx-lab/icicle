@@ -155,13 +155,6 @@ namespace virgo {
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    // If we set num_threads = 1024 (max thread), we would get "too many resources requested for launch"
-    // https://stackoverflow.com/a/29901673
-    // We work around this by reducing the number of thread per block and increasing num_blocks.
-    if (num_threads == 1024) {
-      num_threads /= 2;
-      num_blocks *= 2;
-    }
     bk_produce_case_1_multiply <<< num_blocks, num_threads >>> (table1, table2, device_tmp, n);
 
     auto err2 = CHK_LAST();

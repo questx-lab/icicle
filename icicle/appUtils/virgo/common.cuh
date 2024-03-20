@@ -48,6 +48,14 @@ namespace virgo {
     int num_threads = worker_count < prop.maxThreadsPerBlock ? worker_count : prop.maxThreadsPerBlock;
     int num_blocks = (worker_count + num_threads - 1) / num_threads;
 
+    // If we set num_threads = 1024 (max thread), we would get "too many resources requested for launch"
+    // https://stackoverflow.com/a/29901673
+    // We work around this by reducing the number of thread per block and increasing num_blocks.
+    if (num_threads == 1024) {
+      num_threads /= 2;
+      num_blocks *= 2;
+    }
+
     return std::make_tuple(num_blocks, num_threads);
   }
 }

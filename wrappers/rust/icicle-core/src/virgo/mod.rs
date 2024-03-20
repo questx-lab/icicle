@@ -84,12 +84,7 @@ pub trait Virgo<F: FieldImpl> {
     ) -> IcicleResult<()>;
 
     //// Merkle tree
-    fn build_merkle_tree(
-        config: &MerkleTreeConfig<F>,
-        table: &HostOrDeviceSlice<F>,
-        result: &mut HostOrDeviceSlice<F>,
-        n: u32,
-    ) -> IcicleResult<()>;
+    fn build_merkle_tree(config: &MerkleTreeConfig<F>, tree: &mut HostOrDeviceSlice<F>, n: u32) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -146,17 +141,12 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::bk_produce_case_2(config, table, result, n)
 }
 
-pub fn build_merkle_tree<F>(
-    config: &MerkleTreeConfig<F>,
-    table: &HostOrDeviceSlice<F>,
-    result: &mut HostOrDeviceSlice<F>,
-    n: u32,
-) -> IcicleResult<()>
+pub fn build_merkle_tree<F>(config: &MerkleTreeConfig<F>, tree: &mut HostOrDeviceSlice<F>, n: u32) -> IcicleResult<()>
 where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
 {
-    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, table, result, n)
+    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n)
 }
 
 #[macro_export]
@@ -216,8 +206,7 @@ macro_rules! impl_virgo {
                 #[link_name = concat!($field_prefix, "BuildMerkleTree")]
                 pub(crate) fn _build_merkle_tree(
                     config: &MerkleTreeConfig<$field>,
-                    arr: *const $field,
-                    result: *mut $field,
+                    tree: *mut $field,
                     n: u32,
                 ) -> CudaError;
             }
@@ -286,13 +275,10 @@ macro_rules! impl_virgo {
 
             fn build_merkle_tree(
                 config: &MerkleTreeConfig<$field>,
-                table: &HostOrDeviceSlice<$field>,
-                result: &mut HostOrDeviceSlice<$field>,
+                tree: &mut HostOrDeviceSlice<$field>,
                 n: u32,
             ) -> IcicleResult<()> {
-                unsafe {
-                    $field_prefix_ident::_build_merkle_tree(config, table.as_ptr(), result.as_mut_ptr(), n).wrap()
-                }
+                unsafe { $field_prefix_ident::_build_merkle_tree(config, tree.as_mut_ptr(), n).wrap() }
             }
         }
     };

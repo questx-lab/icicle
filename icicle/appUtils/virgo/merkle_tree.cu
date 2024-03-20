@@ -42,10 +42,8 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* arr, S* tree, int n) {
+  cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* tree, int n) {
     auto stream = config.ctx.stream;
-
-    CHK_IF_RETURN(cudaMemcpyAsync(tree, arr, n * sizeof(S), cudaMemcpyDeviceToDevice, stream));
 
     auto x = n;
     auto offset = 0;

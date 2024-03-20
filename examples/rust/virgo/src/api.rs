@@ -30,7 +30,7 @@ mod test {
     use std::time::Instant;
 
     fn gen_input() -> (Vec<ArkFrBN254>, Vec<ArkFrBN254>) {
-        let n = 1 << 4;
+        let n = 1 << 21;
         let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
         let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
@@ -218,31 +218,9 @@ mod test {
         println!("Test passed!");
     }
 
-    // #[test]
-    // fn test_mimc_hash() {
-    //     // let arr = gen_input().0;
-    //     let arr = vec![ArkFrBN254::from(123u8), ArkFrBN254::from(96u8)];
-    //     let n = arr.len();
-    //     let start = Instant::now();
-    //     let a_slice = arks_to_icicles_device(&arr);
-    //     let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
-
-    //     let params = K_BN254.to_vec();
-
-    //     let device_d = u32s_to_device(&D.to_vec());
-    //     let device_params = arks_to_icicles_device(&params);
-    //     let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
-
-    //     build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
-
-    //     let result = icicles_to_arks(result_slice, 1);
-    //     println!("hash result = {}", result[0].to_string());
-    // }
-
     #[test]
     fn test_build_merkle_tree() {
-        // let arr = gen_input().0;
-        let arr = vec![
+        let input = vec![
             ArkFrBN254::from(1),
             ArkFrBN254::from(2),
             ArkFrBN254::from(3),
@@ -253,10 +231,18 @@ mod test {
             ArkFrBN254::from(8),
         ];
 
-        let n = arr.len();
-        let start = Instant::now();
-        let a_slice = arks_to_icicles_device(&arr);
+        let start0 = Instant::now();
+
+        let n = input.len();
+        // let a_slice = arks_to_icicles_device(&input);
+
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(2 * n - 1).unwrap();
+        let a: Vec<IcicleFrBN254> = cfg_into_iter!(&input)
+            .map(|x| IcicleFrBN254::from(x.0 .0))
+            .collect();
+        result_slice
+            .copy_from_host_with_size(&a, n)
+            .unwrap();
 
         let params = K_BN254.to_vec();
 
@@ -264,7 +250,8 @@ mod test {
         let device_params = arks_to_icicles_device(&params);
         let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
 
-        build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
+        let start = Instant::now();
+        build_merkle_tree(&device_config, &mut result_slice, n as u32);
 
         let result = icicles_to_arks(result_slice, 2 * n - 1)[n..].to_vec();
 

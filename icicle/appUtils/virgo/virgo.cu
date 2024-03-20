@@ -43,11 +43,9 @@ namespace virgo {
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BuildMerkleTree) (
     const MerkleTreeConfig<curve_config::scalar_t> &config,
-    curve_config::scalar_t* table,
-    curve_config::scalar_t* output,
+    curve_config::scalar_t* tree,
     int n)
   {
-    return build_merkle_tree<curve_config::scalar_t>(config, table, output, n);
-    // return build_merkle_tree<curve_config::scalar_t>(table, output, n);
+    return build_merkle_tree<curve_config::scalar_t>(config, tree, n);
   }
 }
