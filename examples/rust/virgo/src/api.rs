@@ -267,7 +267,6 @@ mod test {
         build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
 
         let result = icicles_to_arks(result_slice, 2 * n - 1)[n..].to_vec();
-        println!("hash result = {}", result[0].to_string());
 
         let expected = vec![
             ArkFrBN254::from_str("2125786076286291193686112931062780544355053628865661388448738299372101689918")

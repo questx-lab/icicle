@@ -7,9 +7,6 @@
 #include <tuple>
 
 namespace virgo {
-
-  // __global__ const uint32_t D[8] = {1, 31, 19, 23, 13, 17, 7, 11};
-
   template <typename S>
   __device__ S hash_one_field(S x) {
     auto result = x * x;
@@ -46,8 +43,6 @@ namespace virgo {
 
   template <typename S>
   cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* arr, S* tree, int n) {
-    print_arr(arr, 0, 1);
-    print_arr(config.mimc_params, 0, 1);
     auto stream = config.ctx.stream;
 
     CHK_IF_RETURN(cudaMemcpyAsync(tree, arr, n * sizeof(S), cudaMemcpyDeviceToDevice, stream));
@@ -60,8 +55,6 @@ namespace virgo {
       offset += x;
       x = x / 2;
     }
-
-    // print_arr(tree, n, 2 * n - 1);
 
     return CHK_LAST();
   }
