@@ -218,6 +218,28 @@ mod test {
         println!("Test passed!");
     }
 
+    fn get_merkle_tree(input: &Vec<ArkFrBN254>) -> HostOrDeviceSlice<'static, IcicleFrBN254> {
+        let n = input.len();
+        let mut tree_slice = HostOrDeviceSlice::cuda_malloc(2 * n - 1).unwrap();
+        let a: Vec<IcicleFrBN254> = cfg_into_iter!(&input)
+            .map(|x| IcicleFrBN254::from(x.0 .0))
+            .collect();
+        tree_slice
+            .copy_from_host_with_size(&a, n)
+            .unwrap();
+
+        let params = K_BN254.to_vec();
+
+        let device_d = u32s_to_device(&D.to_vec());
+        let device_params = arks_to_icicles_device(&params);
+        let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
+
+        let start = Instant::now();
+        build_merkle_tree(&device_config, &mut tree_slice, n as u32);
+
+        tree_slice
+    }
+
     #[test]
     fn test_build_merkle_tree() {
         let input = vec![
@@ -231,29 +253,10 @@ mod test {
             ArkFrBN254::from(8),
         ];
 
-        let start0 = Instant::now();
+        let tree_slice = get_merkle_tree(&input);
 
         let n = input.len();
-        // let a_slice = arks_to_icicles_device(&input);
-
-        let mut result_slice = HostOrDeviceSlice::cuda_malloc(2 * n - 1).unwrap();
-        let a: Vec<IcicleFrBN254> = cfg_into_iter!(&input)
-            .map(|x| IcicleFrBN254::from(x.0 .0))
-            .collect();
-        result_slice
-            .copy_from_host_with_size(&a, n)
-            .unwrap();
-
-        let params = K_BN254.to_vec();
-
-        let device_d = u32s_to_device(&D.to_vec());
-        let device_params = arks_to_icicles_device(&params);
-        let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
-
-        let start = Instant::now();
-        build_merkle_tree(&device_config, &mut result_slice, n as u32);
-
-        let result = icicles_to_arks(result_slice, 2 * n - 1)[n..].to_vec();
+        let result = icicles_to_arks(tree_slice, 2 * n - 1)[n..].to_vec();
 
         let expected = vec![
             ArkFrBN254::from_str("2125786076286291193686112931062780544355053628865661388448738299372101689918")
