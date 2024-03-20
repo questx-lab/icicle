@@ -2,6 +2,9 @@ use icicle_cuda_runtime::device_context::{DeviceContext, DEFAULT_DEVICE_ID};
 use icicle_cuda_runtime::memory::HostOrDeviceSlice;
 
 use crate::{error::IcicleResult, traits::FieldImpl};
+use rand::rngs::StdRng;
+use rand::Rng;
+use rand::SeedableRng;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -26,23 +29,23 @@ impl<'a> SumcheckConfig<'a> {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct MerkleTreeConfig<'a> {
+pub struct MerkleTreeConfig<'a, F: FieldImpl> {
     /// Details related to the device such as its id and stream id. See [DeviceContext](@ref device_context::DeviceContext).
     pub ctx: DeviceContext<'a>,
-    pub MAX_MIMC_K: u32,
+    pub max_mimc_k: u32,
+
+    // These are array addresses on device. Do not use them on host.
+    pub mimc_params: *const F,
+    pub d: *const u32,
 }
 
-impl<'a> Default for MerkleTreeConfig<'a> {
-    fn default() -> Self {
-        Self::default_for_device(DEFAULT_DEVICE_ID)
-    }
-}
-
-impl<'a> MerkleTreeConfig<'a> {
-    pub fn default_for_device(device_id: usize) -> Self {
+impl<'a, F: FieldImpl> MerkleTreeConfig<'a, F> {
+    pub fn default_for_device(mimc_params: &HostOrDeviceSlice<F>, max_mimc_k: u32, d: &HostOrDeviceSlice<u32>) -> Self {
         Self {
-            ctx: DeviceContext::default_for_device(device_id),
-            MAX_MIMC_K: 128,
+            ctx: DeviceContext::default_for_device(DEFAULT_DEVICE_ID),
+            max_mimc_k: mimc_params.len() as u32,
+            mimc_params: mimc_params.as_ptr(),
+            d: d.as_ptr(),
         }
     }
 }
@@ -82,7 +85,7 @@ pub trait Virgo<F: FieldImpl> {
 
     //// Merkle tree
     fn build_merkle_tree(
-        config: &MerkleTreeConfig,
+        config: &MerkleTreeConfig<F>,
         table: &HostOrDeviceSlice<F>,
         result: &mut HostOrDeviceSlice<F>,
         n: u32,
@@ -144,7 +147,7 @@ where
 }
 
 pub fn build_merkle_tree<F>(
-    config: &MerkleTreeConfig,
+    config: &MerkleTreeConfig<F>,
     table: &HostOrDeviceSlice<F>,
     result: &mut HostOrDeviceSlice<F>,
     n: u32,
@@ -212,7 +215,7 @@ macro_rules! impl_virgo {
             extern "C" {
                 #[link_name = concat!($field_prefix, "BuildMerkleTree")]
                 pub(crate) fn _build_merkle_tree(
-                    config: &MerkleTreeConfig,
+                    config: &MerkleTreeConfig<$field>,
                     arr: *const $field,
                     result: *mut $field,
                     n: u32,
@@ -282,7 +285,7 @@ macro_rules! impl_virgo {
             }
 
             fn build_merkle_tree(
-                config: &MerkleTreeConfig,
+                config: &MerkleTreeConfig<$field>,
                 table: &HostOrDeviceSlice<$field>,
                 result: &mut HostOrDeviceSlice<$field>,
                 n: u32,

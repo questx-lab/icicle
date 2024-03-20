@@ -1,8 +1,15 @@
 #[cfg(test)]
 mod test {
+    use crate::constant::ArkFrBN254;
+    use crate::constant::D;
+    use crate::constant::K_BN254;
+    use crate::constant::MAX_MIMC_K;
+
     use ark_ff::BigInt;
+    use ark_ff::Field;
     use ark_ff::Fp;
     use ark_ff::PrimeField;
+    use ark_ff::UniformRand;
     use ark_std::cfg_into_iter;
 
     use icicle_bn254::curve::ScalarField as IcicleFrBN254;
@@ -11,6 +18,8 @@ mod test {
     use icicle_core::virgo::bk_produce_case_2;
     use icicle_core::virgo::bk_sum_all_case_1;
     use icicle_core::virgo::bk_sum_all_case_2;
+    use icicle_core::virgo::build_merkle_tree;
+    use icicle_core::virgo::MerkleTreeConfig;
     use icicle_core::virgo::SumcheckConfig;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice::Device;
@@ -20,10 +29,8 @@ mod test {
     use std::str::FromStr;
     use std::time::Instant;
 
-    pub type ArkFrBN254 = ark_bn254::Fr;
-
     fn gen_input() -> (Vec<ArkFrBN254>, Vec<ArkFrBN254>) {
-        let n = 1 << 20;
+        let n = 1 << 4;
         let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
         let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
@@ -45,7 +52,7 @@ mod test {
         (a, b)
     }
 
-    fn arks_to_icicles(arr1: &Vec<ArkFrBN254>) -> HostOrDeviceSlice<'static, IcicleFrBN254> {
+    fn arks_to_icicles_device(arr1: &Vec<ArkFrBN254>) -> HostOrDeviceSlice<'static, IcicleFrBN254> {
         let n = arr1.len();
         let mut a_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
         let a: Vec<IcicleFrBN254> = cfg_into_iter!(&arr1)
@@ -53,6 +60,15 @@ mod test {
             .collect();
         a_slice
             .copy_from_host(&a)
+            .unwrap();
+
+        a_slice
+    }
+
+    fn u32s_to_device(arr1: &Vec<u32>) -> HostOrDeviceSlice<'static, u32> {
+        let mut a_slice = HostOrDeviceSlice::cuda_malloc(arr1.len()).unwrap();
+        a_slice
+            .copy_from_host(&arr1)
             .unwrap();
 
         a_slice
@@ -76,8 +92,8 @@ mod test {
     fn test_bk_sum_all_case_1() {
         let (arr1, arr2) = gen_input();
         let n = arr1.len();
-        let mut a_slice = arks_to_icicles(&arr1);
-        let mut b_slice = arks_to_icicles(&arr2);
+        let mut a_slice = arks_to_icicles_device(&arr1);
+        let mut b_slice = arks_to_icicles_device(&arr2);
 
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
 
@@ -116,7 +132,7 @@ mod test {
     fn test_bk_sum_all_case_2() {
         let arr = gen_input().0;
         let n = arr.len();
-        let mut a_slice = arks_to_icicles(&arr);
+        let mut a_slice = arks_to_icicles_device(&arr);
 
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
 
@@ -144,8 +160,8 @@ mod test {
         let (arr1, arr2) = gen_input();
         let n = arr1.len();
         let start = Instant::now();
-        let mut a_slice = arks_to_icicles(&arr1);
-        let mut b_slice = arks_to_icicles(&arr2);
+        let mut a_slice = arks_to_icicles_device(&arr1);
+        let mut b_slice = arks_to_icicles_device(&arr2);
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
@@ -179,7 +195,7 @@ mod test {
         let arr = gen_input().0;
         let n = arr.len();
         let start = Instant::now();
-        let mut a_slice = arks_to_icicles(&arr);
+        let mut a_slice = arks_to_icicles_device(&arr);
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
@@ -200,5 +216,34 @@ mod test {
         assert_eq!(cpu_sum, result);
 
         println!("Test passed!");
+    }
+
+    #[test]
+    fn test_build_merkle_tree() {
+        // let arr = gen_input().0;
+        let arr = vec![ArkFrBN254::from(123u8), ArkFrBN254::from(96u8)];
+        let n = arr.len();
+        let start = Instant::now();
+        let a_slice = arks_to_icicles_device(&arr);
+        let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
+
+        // let mut rng = StdRng::seed_from_u64(200);
+        // let mut params = vec![];
+        // for i in 0..MAX_MIMC_K {
+        //     // params.push(ArkFrBN254::rand(&mut rng));
+        //     params.push(ArkFrBN254::from((i + 2) as u128));
+        // }
+
+        let params = K_BN254.to_vec();
+
+        // let d = [1, 31, 19, 23, 13, 17, 7, 11];
+        let device_d = u32s_to_device(&D.to_vec());
+        let device_params = arks_to_icicles_device(&params);
+        let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
+
+        build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
+
+        let result = icicles_to_arks(result_slice, 1);
+        println!("hash result = {}", result[0].to_string());
     }
 }

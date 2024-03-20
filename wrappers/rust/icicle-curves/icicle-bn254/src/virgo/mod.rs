@@ -1,5 +1,6 @@
 use crate::curve::{ScalarCfg, ScalarField};
 
+use core::mem::MaybeUninit;
 use icicle_core::error::IcicleResult;
 use icicle_core::impl_virgo;
 use icicle_core::traits::IcicleResultWrap;

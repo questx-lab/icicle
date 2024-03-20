@@ -18,9 +18,10 @@ namespace virgo {
 
   template <typename S>
   struct MerkleTreeConfig {
-    uint32_t D[8];
-    uint32_t MAX_MIMC_K;
+    device_context::DeviceContext ctx;
+    uint32_t max_mimc_k;
     S* mimc_params;
+    uint32_t* D;
   };
 }
 
