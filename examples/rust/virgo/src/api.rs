@@ -74,7 +74,7 @@ mod test {
         a_slice
     }
 
-    fn icicles_to_arks(result_slice: HostOrDeviceSlice<'static, IcicleFrBN254>, n: usize) -> Vec<ArkFrBN254> {
+    fn icicles_to_arks(result_slice: &HostOrDeviceSlice<'static, IcicleFrBN254>, n: usize) -> Vec<ArkFrBN254> {
         let mut result_mont = vec![IcicleFrBN254::zero(); n];
         result_slice
             .copy_to_host(&mut result_mont)
@@ -142,7 +142,7 @@ mod test {
         println!("DONE Running on GPU, time = {:.2?}", start.elapsed());
         let start = Instant::now();
 
-        let result = icicles_to_arks(result_slice, 1)[0];
+        let result = icicles_to_arks(&result_slice, 1)[0];
 
         // double check with the result on cpu
         let mut cpu_sum = ArkFrBN254::from(0u128);
@@ -173,7 +173,7 @@ mod test {
             n as u32,
         );
 
-        let result = icicles_to_arks(result_slice, 3);
+        let result = icicles_to_arks(&result_slice, 3);
 
         // double check with the result on cpu
         let mut cpu_sum = vec![ArkFrBN254::from(0u128); 3];
@@ -201,7 +201,7 @@ mod test {
 
         _ = bk_produce_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32);
 
-        let result = icicles_to_arks(result_slice, 3);
+        let result = icicles_to_arks(&result_slice, 3);
 
         // double check with the result on cpu
         let mut cpu_sum = vec![ArkFrBN254::from(0u128); 3];
@@ -240,8 +240,45 @@ mod test {
         tree_slice
     }
 
+    fn get_merkle_path(
+        tree_slice: &HostOrDeviceSlice<IcicleFrBN254>,
+        n: usize,
+        index: usize,
+    ) -> (ArkFrBN254, Vec<ArkFrBN254>) {
+        let mut ice_values = vec![IcicleFrBN254::zero(); 1];
+        let mut ice_result = vec![];
+
+        let start = Instant::now();
+        let mut x_n = n;
+        let mut x_index = index;
+        let mut offset = 0;
+        let mut leave_value = ArkFrBN254::from(0u128);
+        loop {
+            tree_slice.copy_to_host_at_index(&mut ice_values, 0, offset + x_index);
+            let result: Vec<ArkFrBN254> = ice_values
+                .iter()
+                .map(|x| Fp(BigInt(x.limbs), std::marker::PhantomData))
+                .collect();
+            if offset == 0 {
+                leave_value = result[0];
+            } else {
+                ice_result.push(result[0]);
+            }
+
+            offset += x_n;
+            x_index = x_index / 2;
+            x_n /= 2;
+            if x_n == 0 {
+                break;
+            }
+        }
+
+        (leave_value, ice_result)
+    }
+
     #[test]
     fn test_build_merkle_tree() {
+        // let input = gen_input().0;
         let input = vec![
             ArkFrBN254::from(1),
             ArkFrBN254::from(2),
@@ -256,7 +293,7 @@ mod test {
         let tree_slice = get_merkle_tree(&input);
 
         let n = input.len();
-        let result = icicles_to_arks(tree_slice, 2 * n - 1)[n..].to_vec();
+        let result = icicles_to_arks(&tree_slice, 2 * n - 1)[n..].to_vec();
 
         let expected = vec![
             ArkFrBN254::from_str("2125786076286291193686112931062780544355053628865661388448738299372101689918")
@@ -275,5 +312,25 @@ mod test {
                 .unwrap(),
         ];
         assert_eq!(expected, result);
+
+        // let index = 4;
+        for index in 0..8 {
+            let (leave_value, ice_result) = get_merkle_path(&tree_slice, n, index);
+            assert_eq!(input[index], leave_value);
+
+            let mut len = input.len() / 2;
+            let mut x = index / 2;
+            let mut offset = 0;
+            let log_n = input
+                .len()
+                .ilog2() as usize;
+
+            for i in 0..log_n {
+                assert_eq!(expected[offset + x], ice_result[i]);
+                offset += len;
+                len /= 2;
+                x /= 2;
+            }
+        }
     }
 }
