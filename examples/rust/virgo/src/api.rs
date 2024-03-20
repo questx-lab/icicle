@@ -218,32 +218,73 @@ mod test {
         println!("Test passed!");
     }
 
+    // #[test]
+    // fn test_mimc_hash() {
+    //     // let arr = gen_input().0;
+    //     let arr = vec![ArkFrBN254::from(123u8), ArkFrBN254::from(96u8)];
+    //     let n = arr.len();
+    //     let start = Instant::now();
+    //     let a_slice = arks_to_icicles_device(&arr);
+    //     let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
+
+    //     let params = K_BN254.to_vec();
+
+    //     let device_d = u32s_to_device(&D.to_vec());
+    //     let device_params = arks_to_icicles_device(&params);
+    //     let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
+
+    //     build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
+
+    //     let result = icicles_to_arks(result_slice, 1);
+    //     println!("hash result = {}", result[0].to_string());
+    // }
+
     #[test]
     fn test_build_merkle_tree() {
         // let arr = gen_input().0;
-        let arr = vec![ArkFrBN254::from(123u8), ArkFrBN254::from(96u8)];
+        let arr = vec![
+            ArkFrBN254::from(1),
+            ArkFrBN254::from(2),
+            ArkFrBN254::from(3),
+            ArkFrBN254::from(4),
+            ArkFrBN254::from(5),
+            ArkFrBN254::from(6),
+            ArkFrBN254::from(7),
+            ArkFrBN254::from(8),
+        ];
+
         let n = arr.len();
         let start = Instant::now();
         let a_slice = arks_to_icicles_device(&arr);
-        let mut result_slice = HostOrDeviceSlice::cuda_malloc(1).unwrap();
-
-        // let mut rng = StdRng::seed_from_u64(200);
-        // let mut params = vec![];
-        // for i in 0..MAX_MIMC_K {
-        //     // params.push(ArkFrBN254::rand(&mut rng));
-        //     params.push(ArkFrBN254::from((i + 2) as u128));
-        // }
+        let mut result_slice = HostOrDeviceSlice::cuda_malloc(2 * n - 1).unwrap();
 
         let params = K_BN254.to_vec();
 
-        // let d = [1, 31, 19, 23, 13, 17, 7, 11];
         let device_d = u32s_to_device(&D.to_vec());
         let device_params = arks_to_icicles_device(&params);
         let device_config = MerkleTreeConfig::default_for_device(&device_params, MAX_MIMC_K, &device_d);
 
         build_merkle_tree(&device_config, &a_slice, &mut result_slice, n as u32);
 
-        let result = icicles_to_arks(result_slice, 1);
+        let result = icicles_to_arks(result_slice, 2 * n - 1)[n..].to_vec();
         println!("hash result = {}", result[0].to_string());
+
+        let expected = vec![
+            ArkFrBN254::from_str("2125786076286291193686112931062780544355053628865661388448738299372101689918")
+                .unwrap(),
+            ArkFrBN254::from_str("7566809574148433254186606897930770637848696490879826179200753398937677504597")
+                .unwrap(),
+            ArkFrBN254::from_str("6723075676534364259334340678583760616904048274740060999234670172267306587926")
+                .unwrap(),
+            ArkFrBN254::from_str("21498508090997097154125611486167291905316593418498458053376396031068091751763")
+                .unwrap(),
+            ArkFrBN254::from_str("11257601743655441955364798273076808917833807565662665471407412214232759496044")
+                .unwrap(),
+            ArkFrBN254::from_str("2458844257376397839950928938995518455050045729085527518555442443771609467092")
+                .unwrap(),
+            ArkFrBN254::from_str("20650870930010328676568597081132406095907917425495461688177797913895684422544")
+                .unwrap(),
+        ];
+        assert_eq!(expected, result);
     }
 }
