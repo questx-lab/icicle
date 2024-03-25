@@ -295,7 +295,7 @@ mod test {
         ];
 
         let (device_config, mut tree_slice) = get_merkle_tree(&input);
-        build_merkle_tree(&device_config, &mut tree_slice, input.len() as u32, 0).unwrap();
+        build_merkle_tree(&device_config, &mut tree_slice, input.len() as u32).unwrap();
 
         let n = input.len();
         let result = icicles_to_arks(&tree_slice, 2 * n - 1)[n..].to_vec();

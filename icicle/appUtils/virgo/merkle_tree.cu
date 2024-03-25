@@ -50,22 +50,6 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t build_merkle_tree_no_slice(const MerkleTreeConfig<S>& config, S* tree, int n) {
-    auto stream = config.ctx.stream;
-
-    auto x = n;
-    auto offset = 0;
-    while (x > 1) {
-      auto [num_blocks, num_threads] = find_thread_block(x >> 1);
-      mimc_hash_array <<< num_blocks, num_threads, 0, stream >>> (config, tree + offset, tree + offset + x, 2);
-      offset += x;
-      x = x / 2;
-    }
-
-    return CHK_LAST();
-  }
-
-  template <typename S>
   __global__ void hash_slice(const MerkleTreeConfig<S> config, S* arr, S* output, int n, int slice_size) {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -82,7 +66,18 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* tree, int n, int slice_size) {
-    return build_merkle_tree_no_slice(config, tree, n);
+  cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* tree, int n) {
+    auto stream = config.ctx.stream;
+
+    auto x = n;
+    auto offset = 0;
+    while (x > 1) {
+      auto [num_blocks, num_threads] = find_thread_block(x >> 1);
+      mimc_hash_array <<< num_blocks, num_threads, 0, stream >>> (config, tree + offset, tree + offset + x, 2);
+      offset += x;
+      x = x / 2;
+    }
+
+    return CHK_LAST();
   }
 }
