@@ -73,20 +73,16 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t build_merkle_tree_with_slice(const MerkleTreeConfig<S>& config, S* tree, int n, int slice_size) {
+  cudaError_t hash_merkle_tree_slice(const MerkleTreeConfig<S>& config, S* input, S* output, int n, int slice_size) {
     auto slice_count = n / slice_size;
     auto [num_blocks, num_threads] = find_thread_block(slice_count);
-    hash_slice <<< num_blocks, num_threads >>> (config, tree, tree + n, n, slice_size);
+    hash_slice <<< num_blocks, num_threads >>> (config, input, output, n, slice_size);
 
-    return build_merkle_tree_no_slice(config, tree + n, slice_count);
+    return CHK_LAST();
   }
 
   template <typename S>
   cudaError_t build_merkle_tree(const MerkleTreeConfig<S>& config, S* tree, int n, int slice_size) {
-    if (slice_size <= 0) {
-      return build_merkle_tree_no_slice(config, tree, n);
-    }
-
-    return build_merkle_tree_with_slice(config, tree, n, slice_size);
+    return build_merkle_tree_no_slice(config, tree, n);
   }
 }

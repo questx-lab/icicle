@@ -87,6 +87,14 @@ pub trait Virgo<F: FieldImpl> {
         n: u32,
         slice_size: u32,
     ) -> IcicleResult<()>;
+
+    fn hash_merkle_tree_slice(
+        config: &MerkleTreeConfig<F>,
+        input: &mut HostOrDeviceSlice<F>,
+        output: &mut HostOrDeviceSlice<F>,
+        n: u32,
+        slice_size: u32,
+    ) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -157,6 +165,21 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n, slice_size)
 }
 
+pub fn hash_merkle_tree_slice<F>(
+    config: &MerkleTreeConfig<F>,
+    input: &mut HostOrDeviceSlice<F>,
+    output: &mut HostOrDeviceSlice<F>,
+    n: u32,
+    slice_size: u32,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    assert!(n % slice_size == 0);
+    <<F as FieldImpl>::Config as Virgo<F>>::hash_merkle_tree_slice(config, input, output, n, slice_size)
+}
+
 #[macro_export]
 macro_rules! impl_virgo {
     (
@@ -215,6 +238,17 @@ macro_rules! impl_virgo {
                 pub(crate) fn _build_merkle_tree(
                     config: &MerkleTreeConfig<$field>,
                     tree: *mut $field,
+                    n: u32,
+                    slice_size: u32,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "HashMerkleTreeSlice")]
+                pub(crate) fn _hash_merkle_tree_slice(
+                    config: &MerkleTreeConfig<$field>,
+                    input: *mut $field,
+                    output: *mut $field,
                     n: u32,
                     slice_size: u32,
                 ) -> CudaError;
@@ -289,6 +323,25 @@ macro_rules! impl_virgo {
                 slice_size: u32,
             ) -> IcicleResult<()> {
                 unsafe { $field_prefix_ident::_build_merkle_tree(config, tree.as_mut_ptr(), n, slice_size).wrap() }
+            }
+
+            fn hash_merkle_tree_slice(
+                config: &MerkleTreeConfig<$field>,
+                input: &mut HostOrDeviceSlice<$field>,
+                output: &mut HostOrDeviceSlice<$field>,
+                n: u32,
+                slice_size: u32,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_hash_merkle_tree_slice(
+                        config,
+                        input.as_mut_ptr(),
+                        output.as_mut_ptr(),
+                        n,
+                        slice_size,
+                    )
+                    .wrap()
+                }
             }
         }
     };
