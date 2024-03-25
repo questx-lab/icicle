@@ -85,7 +85,7 @@ pub trait Virgo<F: FieldImpl> {
 
     fn hash_merkle_tree_slice(
         config: &MerkleTreeConfig<F>,
-        input: &mut HostOrDeviceSlice<F>,
+        input: &HostOrDeviceSlice<F>,
         output: &mut HostOrDeviceSlice<F>,
         n: u32,
         slice_size: u32,
@@ -156,7 +156,7 @@ where
 
 pub fn hash_merkle_tree_slice<F>(
     config: &MerkleTreeConfig<F>,
-    input: &mut HostOrDeviceSlice<F>,
+    input: &HostOrDeviceSlice<F>,
     output: &mut HostOrDeviceSlice<F>,
     n: u32,
     slice_size: u32,
@@ -235,7 +235,7 @@ macro_rules! impl_virgo {
                 #[link_name = concat!($field_prefix, "HashMerkleTreeSlice")]
                 pub(crate) fn _hash_merkle_tree_slice(
                     config: &MerkleTreeConfig<$field>,
-                    input: *mut $field,
+                    input: *const $field,
                     output: *mut $field,
                     n: u32,
                     slice_size: u32,
@@ -314,7 +314,7 @@ macro_rules! impl_virgo {
 
             fn hash_merkle_tree_slice(
                 config: &MerkleTreeConfig<$field>,
-                input: &mut HostOrDeviceSlice<$field>,
+                input: &HostOrDeviceSlice<$field>,
                 output: &mut HostOrDeviceSlice<$field>,
                 n: u32,
                 slice_size: u32,
@@ -322,7 +322,7 @@ macro_rules! impl_virgo {
                 unsafe {
                     $field_prefix_ident::_hash_merkle_tree_slice(
                         config,
-                        input.as_mut_ptr(),
+                        input.as_ptr(),
                         output.as_mut_ptr(),
                         n,
                         slice_size,
