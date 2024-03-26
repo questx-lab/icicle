@@ -170,7 +170,6 @@ namespace virgo {
 
     auto end1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
-    std::cout << "bk_produce_case_1, GPU Duration = " << duration1.count() << std::endl;
 
     return CHK_LAST();
   }
@@ -235,7 +234,6 @@ namespace virgo {
 
     auto end1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start);
-    std::cout << "bk_produce_case_2, GPU Duration (ms) = " << duration1.count() << std::endl;
 
     return CHK_LAST();
   }
