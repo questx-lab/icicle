@@ -260,7 +260,7 @@ mod test {
             .map(|x| IcicleFrBN254::from(x.0 .0))
             .collect();
         tree_slice
-            .copy_from_host_with_size(&a, n)
+            .copy_from_host_partially(&a)
             .unwrap();
 
         let params = K_BN254.to_vec();

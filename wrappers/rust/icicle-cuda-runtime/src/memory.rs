@@ -138,13 +138,14 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
         Ok(())
     }
 
-    pub fn copy_from_host_with_size(&mut self, val: &[T], n: usize) -> CudaResult<()> {
+    pub fn copy_from_host_partially(&mut self, val: &[T]) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy into, and not host"),
         };
+        assert!(self.len() >= val.len(), "Destination has a larger size than source");
 
-        let size = size_of::<T>() * n;
+        let size = size_of::<T>() * val.len();
         if size != 0 {
             unsafe {
                 cudaMemcpy(
