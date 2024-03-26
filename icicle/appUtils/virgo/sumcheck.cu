@@ -99,10 +99,18 @@ namespace virgo {
   {
     CHK_INIT_IF_RETURN();
 
-    // Sum up all the values in the array.
-    sum_single_array(arr, n);
+    S* device_tmp;
+    // allocate device array
+    cudaMalloc((void**)&device_tmp, n * sizeof(S));
+    cudaMemcpy(device_tmp, arr, n * sizeof(S), cudaMemcpyDeviceToDevice);
 
-    cudaMemcpy(output, arr, sizeof(S), cudaMemcpyHostToHost);
+    // Sum up all the values in the array.
+    sum_single_array(device_tmp, n);
+    // copy the result to output
+    cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyHostToHost);
+
+    // free the temp array.
+    cudaFree(device_tmp);
 
     return CHK_LAST();
   }
