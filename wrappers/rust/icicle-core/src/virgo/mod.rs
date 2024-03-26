@@ -80,6 +80,8 @@ pub trait Virgo<F: FieldImpl> {
         n: u32,
     ) -> IcicleResult<()>;
 
+    fn bk_reduce(config: &SumcheckConfig, arr: &mut HostOrDeviceSlice<F>, n: u32, r: F) -> IcicleResult<()>;
+
     //// Merkle tree
     fn build_merkle_tree(config: &MerkleTreeConfig<F>, tree: &mut HostOrDeviceSlice<F>, n: u32) -> IcicleResult<()>;
 
@@ -131,6 +133,14 @@ where
     <F as FieldImpl>::Config: Virgo<F>,
 {
     <<F as FieldImpl>::Config as Virgo<F>>::bk_produce_case_1(config, table1, table2, result, n)
+}
+
+pub fn bk_reduce<F>(config: &SumcheckConfig, arr: &mut HostOrDeviceSlice<F>, n: u32, r: F) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::bk_reduce(config, arr, n, r)
 }
 
 pub fn bk_produce_case_2<F>(
@@ -223,6 +233,11 @@ macro_rules! impl_virgo {
             }
 
             extern "C" {
+                #[link_name = concat!($field_prefix, "BkReduce")]
+                pub(crate) fn _bk_reduce(config: &SumcheckConfig, arr: *mut $field, n: u32, r: $field) -> CudaError;
+            }
+
+            extern "C" {
                 #[link_name = concat!($field_prefix, "BuildMerkleTree")]
                 pub(crate) fn _build_merkle_tree(
                     config: &MerkleTreeConfig<$field>,
@@ -302,6 +317,15 @@ macro_rules! impl_virgo {
                 unsafe {
                     $field_prefix_ident::_bk_produce_case_2(config, table.as_ptr(), result.as_mut_ptr(), n).wrap()
                 }
+            }
+
+            fn bk_reduce(
+                config: &SumcheckConfig,
+                arr: &mut HostOrDeviceSlice<$field>,
+                n: u32,
+                r: $field,
+            ) -> IcicleResult<()> {
+                unsafe { $field_prefix_ident::_bk_reduce(config, arr.as_mut_ptr(), n, r).wrap() }
             }
 
             fn build_merkle_tree(

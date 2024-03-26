@@ -41,6 +41,15 @@ namespace virgo {
     return bk_produce_case_2<curve_config::scalar_t>(config, table, output, n);
   }
 
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkReduce)(
+    const SumcheckConfig &config,
+    curve_config::scalar_t* arr,
+    int n,
+    curve_config::scalar_t r)
+  {
+    return bk_reduce<curve_config::scalar_t>(config, arr, n, r);
+  }
+
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BuildMerkleTree) (
     const MerkleTreeConfig<curve_config::scalar_t> &config,
     curve_config::scalar_t* tree,

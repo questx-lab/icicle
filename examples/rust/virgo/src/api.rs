@@ -12,6 +12,7 @@ mod test {
     use icicle_core::traits::FieldImpl;
     use icicle_core::virgo::bk_produce_case_1;
     use icicle_core::virgo::bk_produce_case_2;
+    use icicle_core::virgo::bk_reduce;
     use icicle_core::virgo::bk_sum_all_case_1;
     use icicle_core::virgo::bk_sum_all_case_2;
     use icicle_core::virgo::build_merkle_tree;
@@ -26,7 +27,7 @@ mod test {
     use std::time::Instant;
 
     fn gen_input() -> (Vec<ArkFrBN254>, Vec<ArkFrBN254>) {
-        let n = 1 << 21;
+        let n = 1 << 3;
         let mut a: Vec<ArkFrBN254> = Vec::with_capacity(n);
         let mut b: Vec<ArkFrBN254> = Vec::with_capacity(n);
 
@@ -193,7 +194,7 @@ mod test {
         let mut result_slice = HostOrDeviceSlice::cuda_malloc(3).unwrap();
         println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
 
-        _ = bk_produce_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32);
+        bk_produce_case_2(&SumcheckConfig::default(), &a_slice, &mut result_slice, n as u32).unwrap();
 
         let result = icicles_to_arks(&result_slice, 3);
 
@@ -210,6 +211,41 @@ mod test {
         assert_eq!(cpu_sum, result);
 
         println!("Test passed!");
+    }
+
+    #[test]
+    fn test_bk_reduce() {
+        let arr = vec![
+            ArkFrBN254::from(1),
+            ArkFrBN254::from(2),
+            ArkFrBN254::from(3),
+            ArkFrBN254::from(4),
+            ArkFrBN254::from(5),
+            ArkFrBN254::from(6),
+            ArkFrBN254::from(7),
+            ArkFrBN254::from(8),
+        ];
+        let n = arr.len();
+        let start = Instant::now();
+        let mut a_slice = arks_to_icicles_device(&arr);
+        println!("Copy CPU -> GPU: time = {:.2?}", start.elapsed());
+
+        bk_reduce(
+            &SumcheckConfig::default(),
+            &mut a_slice,
+            n as u32,
+            IcicleFrBN254::from_bytes_le(&[3]),
+        )
+        .unwrap();
+
+        let actual = icicles_to_arks(&a_slice, n)[..n / 2].to_vec();
+        let expected = vec![
+            ArkFrBN254::from_str("4").unwrap(),
+            ArkFrBN254::from_str("6").unwrap(),
+            ArkFrBN254::from_str("8").unwrap(),
+            ArkFrBN254::from_str("10").unwrap(),
+        ];
+        assert_eq!(expected, actual);
     }
 
     fn get_merkle_tree(

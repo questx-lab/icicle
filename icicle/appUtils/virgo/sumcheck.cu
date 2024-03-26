@@ -239,4 +239,33 @@ namespace virgo {
 
     return CHK_LAST();
   }
+
+  template <typename S>
+  __global__ void run_bk_reduce(S* arr, S* output, int n, S r) {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    auto index = tid * 2;
+    output[tid] = arr[index] + r * (arr[index + 1] - arr[index]);
+  }
+
+  template <typename S>
+  cudaError_t bk_reduce(const SumcheckConfig& config, S* arr, int n, S r)
+  {
+    auto stream = config.ctx.stream;
+
+    // allocate device array
+    S* device_tmp;
+    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n / 2 * sizeof(S), stream));
+
+    auto [num_blocks, num_threads] = find_thread_block(n / 2);
+    run_bk_reduce <<< num_blocks, num_threads, 0, stream >>> (arr, device_tmp, n / 2, r);
+
+    // copy the output back to the original array.
+    cudaMemcpy(arr, device_tmp, n / 2 * sizeof(S), cudaMemcpyDeviceToDevice);
+
+    // free the tmp array.
+    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+
+    return CHK_LAST();
+  }
 }
