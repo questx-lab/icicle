@@ -159,7 +159,7 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
         }
     }
 
-    fn on_device<'b>(v: &'b [T]) -> HostOrDeviceSlice<'a, T> {
+    pub fn on_device<'b>(v: &'b [T]) -> HostOrDeviceSlice<'a, T> {
         let mut device = HostOrDeviceSlice::cuda_malloc(v.len()).unwrap();
         device
             .copy_from_host(v)
