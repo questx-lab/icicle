@@ -98,7 +98,7 @@ impl<'a, T> HostOrDeviceSlice2DMut<'a, T> {
 
 pub enum HostOrDeviceSlice<'a, T> {
     Host(Vec<T>),
-    Device(&'a mut [T], i32),
+    Device(Option<&'a mut [T]>, i32),
 }
 
 impl<'a, T> HostOrDeviceSlice<'a, T> {
@@ -112,14 +112,30 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Device(s, _) => s.len(),
+            Self::Device(s, _) => {
+                if s.is_none() {
+                    0
+                } else {
+                    s.as_ref()
+                        .unwrap()
+                        .len()
+                }
+            }
             Self::Host(v) => v.len(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
-            Self::Device(s, _) => s.is_empty(),
+            Self::Device(s, _) => {
+                if s.is_none() {
+                    true
+                } else {
+                    s.as_ref()
+                        .unwrap()
+                        .is_empty()
+                }
+            }
             Self::Host(v) => v.is_empty(),
         }
     }
@@ -146,24 +162,40 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
     }
 
     pub fn as_ptr(&self) -> *const T {
+        if self.len() == 0 {
+            return ::std::ptr::null();
+        }
+
         match self {
-            Self::Device(s, _) => s.as_ptr(),
+            Self::Device(s, _) => s
+                .as_ref()
+                .unwrap()
+                .as_ptr(),
             Self::Host(v) => v.as_ptr(),
         }
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut T {
+        if self.len() == 0 {
+            return ::std::ptr::null_mut();
+        }
+
         match self {
-            Self::Device(s, _) => s.as_mut_ptr(),
+            Self::Device(s, _) => s
+                .as_mut()
+                .unwrap()
+                .as_mut_ptr(),
             Self::Host(v) => v.as_mut_ptr(),
         }
     }
 
     pub fn on_device<'b>(v: &'b [T]) -> HostOrDeviceSlice<'a, T> {
         let mut device = HostOrDeviceSlice::cuda_malloc(v.len()).unwrap();
-        device
-            .copy_from_host(v)
-            .unwrap();
+        if v.len() > 0 {
+            device
+                .copy_from_host(v)
+                .unwrap();
+        }
 
         device
     }
@@ -177,15 +209,16 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
         let size = count
             .checked_mul(size_of::<T>())
             .unwrap_or(0);
+
         if size == 0 {
-            return Err(CudaError::cudaErrorMemoryAllocation); //TODO: only CUDA backend should return CudaError
+            return Ok(Self::Device(None, get_device().unwrap() as i32));
         }
 
         let mut device_ptr = MaybeUninit::<*mut c_void>::uninit();
         unsafe {
             cudaMalloc(device_ptr.as_mut_ptr(), size).wrap()?;
             Ok(Self::Device(
-                from_raw_parts_mut(device_ptr.assume_init() as *mut T, count),
+                Some(from_raw_parts_mut(device_ptr.assume_init() as *mut T, count)),
                 get_device().unwrap() as i32,
             ))
         }
@@ -199,11 +232,15 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
             return Err(CudaError::cudaErrorMemoryAllocation);
         }
 
+        if size == 0 {
+            return Ok(Self::Device(None, get_device().unwrap() as i32));
+        }
+
         let mut device_ptr = MaybeUninit::<*mut c_void>::uninit();
         unsafe {
             cudaMallocAsync(device_ptr.as_mut_ptr(), size, stream.handle as *mut _ as *mut _).wrap()?;
             Ok(Self::Device(
-                from_raw_parts_mut(device_ptr.assume_init() as *mut T, count),
+                Some(from_raw_parts_mut(device_ptr.assume_init() as *mut T, count)),
                 get_device().unwrap() as i32,
             ))
         }
@@ -361,7 +398,7 @@ macro_rules! impl_index {
 
                 fn index(&self, index: $t) -> &Self::Output {
                     match self {
-                        Self::Device(s, _) => s.index(index),
+                        Self::Device(s, _) => s.as_ref().unwrap().index(index),
                         Self::Host(v) => v.index(index),
                     }
                 }
@@ -371,7 +408,7 @@ macro_rules! impl_index {
             {
                 fn index_mut(&mut self, index: $t) -> &mut Self::Output {
                     match self {
-                        Self::Device(s,_) => s.index_mut(index),
+                        Self::Device(s,_) => s.as_mut().unwrap().index_mut(index),
                         Self::Host(v) => v.index_mut(index),
                     }
                 }
@@ -391,18 +428,21 @@ impl_index! {
 impl<'a, T> Drop for HostOrDeviceSlice<'a, T> {
     fn drop(&mut self) {
         match self {
-            Self::Device(s, device_id) => {
-                check_device(*device_id);
-                if s.is_empty() {
-                    return;
-                }
+            Self::Device(option_s, device_id) => match option_s {
+                Some(s) => {
+                    check_device(*device_id);
+                    if s.is_empty() {
+                        return;
+                    }
 
-                unsafe {
-                    cudaFree(s.as_mut_ptr() as *mut c_void)
-                        .wrap()
-                        .unwrap();
+                    unsafe {
+                        cudaFree(s.as_mut_ptr() as *mut c_void)
+                            .wrap()
+                            .unwrap();
+                    }
                 }
-            }
+                _ => {}
+            },
             Self::Host(_) => {}
         }
     }
