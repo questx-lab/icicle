@@ -1,5 +1,5 @@
 use icicle_cuda_runtime::device_context::{DeviceContext, DEFAULT_DEVICE_ID};
-use icicle_cuda_runtime::memory::HostOrDeviceSlice;
+use icicle_cuda_runtime::memory::{HostOrDeviceSlice, HostOrDeviceSlice2DMut};
 
 use crate::{error::IcicleResult, traits::FieldImpl};
 
@@ -152,7 +152,7 @@ pub trait Virgo<F: FieldImpl> {
         slice_size: u32,
     ) -> IcicleResult<()>;
 
-    fn circuit_evaluate(circuit: &Circuit<F>, evaluations: &mut Vec<HostOrDeviceSlice<F>>) -> IcicleResult<()>;
+    fn circuit_evaluate(circuit: &Circuit<F>, evaluations: &HostOrDeviceSlice2DMut<F>) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -240,7 +240,7 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::hash_merkle_tree_slice(config, input, output, n, slice_size)
 }
 
-pub fn circuit_evaluate<F>(circuit: &Circuit<F>, evaluations: &mut Vec<HostOrDeviceSlice<F>>) -> IcicleResult<()>
+pub fn circuit_evaluate<F>(circuit: &Circuit<F>, evaluations: &HostOrDeviceSlice2DMut<F>) -> IcicleResult<()>
 where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
@@ -436,14 +436,9 @@ macro_rules! impl_virgo {
 
             fn circuit_evaluate(
                 circuit: &Circuit<$field>,
-                evaluations: &mut Vec<HostOrDeviceSlice<$field>>,
+                evaluations: &HostOrDeviceSlice2DMut<$field>,
             ) -> IcicleResult<()> {
-                let mut evaluations_ptr = vec![];
-                for i in 0..evaluations.len() {
-                    evaluations_ptr.push(evaluations[i].as_mut_ptr());
-                }
-
-                unsafe { $field_prefix_ident::_circuit_evaluate(circuit, evaluations_ptr.as_ptr()).wrap() }
+                unsafe { $field_prefix_ident::_circuit_evaluate(circuit, evaluations.as_ptr()).wrap() }
             }
         }
     };

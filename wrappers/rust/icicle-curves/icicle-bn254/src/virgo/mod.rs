@@ -6,6 +6,10 @@ use icicle_core::{
     traits::IcicleResultWrap,
     virgo::{Circuit, MerkleTreeConfig, SumcheckConfig, Virgo},
 };
-use icicle_cuda_runtime::{device_context::DeviceContext, error::CudaError, memory::HostOrDeviceSlice};
+use icicle_cuda_runtime::{
+    device_context::DeviceContext,
+    error::CudaError,
+    memory::{HostOrDeviceSlice, HostOrDeviceSlice2DMut},
+};
 
 impl_virgo!("bn254", bn254, ScalarField, ScalarCfg);

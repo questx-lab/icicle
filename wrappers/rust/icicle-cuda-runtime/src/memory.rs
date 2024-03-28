@@ -10,6 +10,92 @@ use std::ops::{Index, IndexMut, Range, RangeFrom, RangeFull, RangeInclusive, Ran
 use std::os::raw::c_void;
 use std::slice::from_raw_parts_mut;
 
+pub trait CudaAsPtr {
+    type CudaRepr;
+
+    fn as_ptr(&self) -> *const Self::CudaRepr;
+}
+
+pub struct HostOrDeviceSliceWrapper<'a, W: CudaAsPtr> {
+    // Hold the origin device slices to not drop them.
+    _origin: Vec<W>,
+    ptr: HostOrDeviceSlice<'a, *const W::CudaRepr>,
+}
+
+impl<'a, W: CudaAsPtr> HostOrDeviceSliceWrapper<'a, W> {
+    pub fn new(val: Vec<W>) -> Self {
+        let mut origin_ptr = vec![];
+        for i in 0..val.len() {
+            origin_ptr.push(val[i].as_ptr());
+        }
+
+        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+
+        Self { _origin: val, ptr }
+    }
+
+    pub fn as_ptr(&self) -> *const *const W::CudaRepr {
+        self.ptr
+            .as_ptr()
+    }
+}
+
+pub struct HostOrDeviceSlice2DConst<'a, T> {
+    // Hold the origin device slices to not drop them.
+    _origin: Vec<HostOrDeviceSlice<'a, T>>,
+    ptr: HostOrDeviceSlice<'a, *const T>,
+}
+
+impl<'a, T> HostOrDeviceSlice2DConst<'a, T> {
+    pub fn new(val: Vec<Vec<T>>) -> Self {
+        let mut origin = vec![];
+        let mut origin_ptr = vec![];
+        for i in 0..val.len() {
+            let device = HostOrDeviceSlice::on_device(&val[i]);
+
+            origin_ptr.push(device.as_ptr());
+            origin.push(device);
+        }
+
+        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+
+        Self { _origin: origin, ptr }
+    }
+
+    pub fn as_ptr(&self) -> *const *const T {
+        self.ptr
+            .as_ptr()
+    }
+}
+
+pub struct HostOrDeviceSlice2DMut<'a, T> {
+    // Hold the origin device slices to not drop them.
+    _origin: Vec<HostOrDeviceSlice<'a, T>>,
+    ptr: HostOrDeviceSlice<'a, *mut T>,
+}
+
+impl<'a, T> HostOrDeviceSlice2DMut<'a, T> {
+    pub fn new(val: Vec<Vec<T>>) -> Self {
+        let mut origin = vec![];
+        let mut origin_ptr = vec![];
+        for i in 0..val.len() {
+            let mut device = HostOrDeviceSlice::on_device(&val[i]);
+
+            origin_ptr.push(device.as_mut_ptr());
+            origin.push(device);
+        }
+
+        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+
+        Self { _origin: origin, ptr }
+    }
+
+    pub fn as_ptr(&self) -> *const *mut T {
+        self.ptr
+            .as_ptr()
+    }
+}
+
 pub enum HostOrDeviceSlice<'a, T> {
     Host(Vec<T>),
     Device(&'a mut [T], i32),
@@ -71,6 +157,15 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
             Self::Device(s, _) => s.as_mut_ptr(),
             Self::Host(v) => v.as_mut_ptr(),
         }
+    }
+
+    fn on_device<'b>(v: &'b [T]) -> HostOrDeviceSlice<'a, T> {
+        let mut device = HostOrDeviceSlice::cuda_malloc(v.len()).unwrap();
+        device
+            .copy_from_host(v)
+            .unwrap();
+
+        device
     }
 
     pub fn on_host(src: Vec<T>) -> Self {
