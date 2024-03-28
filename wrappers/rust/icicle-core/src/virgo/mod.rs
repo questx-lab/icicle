@@ -92,18 +92,18 @@ pub struct Layer<F: FieldImpl> {
     pub layer_index: u8,
     pub num_layers: u8,
 
-    pub constant_ext: *const SparseMultilinearExtension<F>,
-    pub mul_ext: *const SparseMultilinearExtension<F>,
-    pub forward_x_ext: *const SparseMultilinearExtension<F>,
-    pub forward_y_ext: *const SparseMultilinearExtension<F>,
+    pub constant_ext: *const *const SparseMultilinearExtension<F>,
+    pub mul_ext: *const *const SparseMultilinearExtension<F>,
+    pub forward_x_ext: *const *const SparseMultilinearExtension<F>,
+    pub forward_y_ext: *const *const SparseMultilinearExtension<F>,
 
-    pub reverse_ext: *const ReverseSparseMultilinearExtension<F>,
+    pub reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
 }
 
 pub struct Circuit<F: FieldImpl> {
     pub num_layers: u8,
     pub layers: *const Layer<F>,
-    pub input_reverse_ext: *const ReverseSparseMultilinearExtension<F>,
+    pub input_reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
 }
 
 /////////////

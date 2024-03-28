@@ -28,7 +28,7 @@ namespace virgo {
 
   template <typename S>
   __global__ void evaluate_single_gate_type(
-    uint8_t num_layers, uint8_t layer_index, uint8_t gate_type, SparseMultilinearExtension<S>* ext, S** evaluations)
+    uint8_t num_layers, uint8_t layer_index, uint8_t gate_type, SparseMultilinearExtension<S>** ext, S** evaluations)
   {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -36,17 +36,17 @@ namespace virgo {
 
     for (uint8_t target_layer_index = layer_index + 1; target_layer_index < num_layers; target_layer_index++) {
       uint8_t ext_index = target_layer_index - layer_index - 1;
-      SparseMultilinearExtension<S> target_ext = ext[ext_index];
+      SparseMultilinearExtension<S>* target_ext = ext[ext_index];
 
-      for (uint8_t i = 0; i < target_ext.z_indices_size[z_index]; i++) {
-        uint32_t k = target_ext.z_indices[z_index][i];
+      for (uint8_t i = 0; i < target_ext->z_indices_size[z_index]; i++) {
+        uint32_t k = target_ext->z_indices[z_index][i];
 
-        if (target_ext.point_z[k] != z_index) { panic(); }
+        if (target_ext->point_z[k] != z_index) { panic(); }
 
-        uint32_t x_index = target_ext.point_x[k];
-        uint32_t y_index = target_ext.point_y[k];
+        uint32_t x_index = target_ext->point_x[k];
+        uint32_t y_index = target_ext->point_y[k];
 
-        S c = target_ext.evaluations[k];
+        S c = target_ext->evaluations[k];
         S x = evaluations[layer_index + 1][x_index];
         S y = evaluations[target_layer_index][y_index];
 
@@ -60,7 +60,7 @@ namespace virgo {
   {
     CHK_INIT_IF_RETURN();
 
-    auto z_num_vars = layer.constant_ext[0].z_num_vars;
+    auto z_num_vars = layer.constant_ext[0]->z_num_vars;
 
     // We need to evaluate 2^num_vars gates of z.
     auto [num_blocks, num_threads] = find_thread_block(1 << z_num_vars);

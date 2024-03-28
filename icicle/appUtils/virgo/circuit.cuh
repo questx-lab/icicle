@@ -61,19 +61,21 @@ namespace virgo {
     uint8_t layer_index;
     uint8_t num_layers;
 
-    SparseMultilinearExtension<S>* constant_ext;
-    SparseMultilinearExtension<S>* mul_ext;
-    SparseMultilinearExtension<S>* forward_x_ext;
-    SparseMultilinearExtension<S>* forward_y_ext;
-
-    ReverseSparseMultilinearExtension<S>* reverse_ext;
+    // This is a one-dimmension array of pointers, NOT a two-dimmension array.
+    SparseMultilinearExtension<S>** constant_ext;
+    SparseMultilinearExtension<S>** mul_ext;
+    SparseMultilinearExtension<S>** forward_x_ext;
+    SparseMultilinearExtension<S>** forward_y_ext;
+    ReverseSparseMultilinearExtension<S>** reverse_ext;
   };
 
   template <typename S>
   struct Circuit {
     uint8_t num_layers;
     Layer<S>* layers;
-    ReverseSparseMultilinearExtension<S>* input_reverse_ext;
+
+    // This is a one-dimmension array of pointers, NOT a two-dimmension array.
+    ReverseSparseMultilinearExtension<S>** input_reverse_ext;
   };
 
 } // namespace virgo
