@@ -11,24 +11,25 @@ namespace virgo {
   /// COMMON FUNCTIONS
   /////////////////////////////////
   template <typename S>
-  __global__ void mul_pair_kernel(S* arr1, S* arr2, S* result, int n) {
+  __global__ void mul_pair_kernel(S* arr1, S* arr2, S* result, int n)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     result[tid] = arr1[tid] * arr2[tid] * (inv_r_mont<S>);
   }
 
   template <typename S>
-  __global__ void reduce_sum_kernel(S* result, uint32_t n, uint32_t half) {
+  __global__ void reduce_sum_kernel(S* result, uint32_t n, uint32_t half)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     auto other = tid + half;
-    if (other < n) {
-      result[tid] = result[tid] + result[other];
-    }
+    if (other < n) { result[tid] = result[tid] + result[other]; }
   }
 
   template <typename S>
-  __global__ void reduce_sum_kernel2(S* result, uint32_t m, uint32_t n, uint32_t half, uint32_t offset) {
+  __global__ void reduce_sum_kernel2(S* result, uint32_t m, uint32_t n, uint32_t half, uint32_t offset)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     uint32_t arr_id = tid % m;
@@ -49,7 +50,7 @@ namespace virgo {
       auto [num_blocks, num_threads] = find_thread_block((x * m) >> 1);
 
       int half = (x + 1) >> 1;
-      reduce_sum_kernel2 <<< num_blocks, num_threads, 0, stream >>> (arrs, m, x, half, n);
+      reduce_sum_kernel2<<<num_blocks, num_threads, 0, stream>>>(arrs, m, x, half, n);
 
       x = (x + 1) >> 1;
     }
@@ -63,7 +64,7 @@ namespace virgo {
       auto [num_blocks, num_threads] = find_thread_block(x >> 1);
 
       int half = (x + 1) >> 1;
-      reduce_sum_kernel <<< num_blocks, num_threads, 0, stream >>> (arr, x, half);
+      reduce_sum_kernel<<<num_blocks, num_threads, 0, stream>>>(arr, x, half);
 
       x = (x + 1) >> 1;
     }
@@ -85,7 +86,7 @@ namespace virgo {
     CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n * sizeof(S), stream));
 
     auto [num_blocks, num_threads] = find_thread_block(n);
-    mul_pair_kernel <<< num_blocks, num_threads, 0, stream >>> (table1, table2, device_tmp, n);
+    mul_pair_kernel<<<num_blocks, num_threads, 0, stream>>>(table1, table2, device_tmp, n);
 
     // 2. Sum up all the values in the array.
     sum_single_array(device_tmp, n, stream);
@@ -124,13 +125,12 @@ namespace virgo {
   /////////////////////////////////
 
   template <typename S>
-  __global__ void bk_produce_case_1_multiply(S* table1, S* table2, S* output, int n) {
+  __global__ void bk_produce_case_1_multiply(S* table1, S* table2, S* output, int n)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     auto half_n = n >> 1;
-    if (tid >= half_n * 3) {
-      return;
-    }
+    if (tid >= half_n * 3) { return; }
 
     S result;
     // auto pid = tid / half_n;
@@ -169,7 +169,7 @@ namespace virgo {
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    bk_produce_case_1_multiply <<< num_blocks, num_threads, 0, stream >>> (table1, table2, device_tmp, n);
+    bk_produce_case_1_multiply<<<num_blocks, num_threads, 0, stream>>>(table1, table2, device_tmp, n);
 
     auto err2 = CHK_LAST();
 
@@ -189,13 +189,12 @@ namespace virgo {
   }
 
   template <typename S>
-  __global__ void bk_produce_case_2_multiply(S* table, S* output, int n) {
+  __global__ void bk_produce_case_2_multiply(S* table, S* output, int n)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     auto half_n = n >> 1;
-    if (tid >= half_n * 3) {
-      return;
-    }
+    if (tid >= half_n * 3) { return; }
 
     S result;
     // auto pid = tid / half_n;
@@ -234,7 +233,7 @@ namespace virgo {
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    bk_produce_case_2_multiply <<< num_blocks, num_threads, 0, stream >>> (table, device_tmp, n);
+    bk_produce_case_2_multiply<<<num_blocks, num_threads, 0, stream>>>(table, device_tmp, n);
 
     auto err2 = CHK_LAST();
 
@@ -255,7 +254,8 @@ namespace virgo {
   }
 
   template <typename S>
-  __global__ void run_bk_reduce(S* arr, S* output, int n, S r) {
+  __global__ void run_bk_reduce(S* arr, S* output, int n, S r)
+  {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     auto index = tid * 2;
@@ -272,7 +272,7 @@ namespace virgo {
     CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n / 2 * sizeof(S), stream));
 
     auto [num_blocks, num_threads] = find_thread_block(n / 2);
-    run_bk_reduce <<< num_blocks, num_threads, 0, stream >>> (arr, device_tmp, n / 2, r);
+    run_bk_reduce<<<num_blocks, num_threads, 0, stream>>>(arr, device_tmp, n / 2, r);
 
     // copy the output back to the original array.
     CHK_IF_RETURN(cudaMemcpyAsync(arr, device_tmp, n / 2 * sizeof(S), cudaMemcpyDeviceToDevice, stream));
@@ -282,4 +282,4 @@ namespace virgo {
 
     return CHK_LAST();
   }
-}
+} // namespace virgo

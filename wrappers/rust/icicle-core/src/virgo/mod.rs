@@ -47,6 +47,65 @@ impl<'a, F: FieldImpl> MerkleTreeConfig<'a, F> {
     }
 }
 
+///////////// CIRCUIT
+
+pub struct SparseMultilinearExtension<F: FieldImpl> {
+    pub size: u32,
+
+    pub z_num_vars: u32,
+    pub x_num_vars: u32,
+    pub y_num_vars: u32,
+
+    pub point_z: *const u32,
+    pub point_x: *const u32,
+    pub point_y: *const u32,
+    pub evaluations: *const F,
+
+    pub z_indices_size: *const u8,
+    pub z_indices: *const *const u32,
+
+    pub x_indices_size: *const u8,
+    pub x_indices: *const *const u32,
+
+    pub y_indices_size: *const u8,
+    pub y_indices: *const *const u32,
+}
+
+pub struct ReverseSparseMultilinearExtension<F: FieldImpl> {
+    pub size: u32,
+
+    pub z_num_vars: u32,
+    pub x_num_vars: u32,
+
+    pub point_z: *const u32,
+    pub point_x: *const u32,
+    pub evaluations: *const F,
+
+    pub z_indices_size: *const u8,
+    pub z_indices: *const *const u32,
+
+    pub x_indices_size: *const u8,
+    pub x_indices: *const *const u32,
+}
+
+pub struct Layer<F: FieldImpl> {
+    pub layer_index: u8,
+    pub num_layers: u8,
+
+    pub constant_ext: *const SparseMultilinearExtension<F>,
+    pub mul_ext: *const SparseMultilinearExtension<F>,
+    pub forward_x_ext: *const SparseMultilinearExtension<F>,
+    pub forward_y_ext: *const SparseMultilinearExtension<F>,
+
+    pub reverse_ext: *const ReverseSparseMultilinearExtension<F>,
+}
+
+pub struct Circuit<F: FieldImpl> {
+    pub num_layers: u8,
+    pub layers: *const Layer<F>,
+    pub input_reverse_ext: *const ReverseSparseMultilinearExtension<F>,
+}
+
 /////////////
 
 pub trait Virgo<F: FieldImpl> {
@@ -92,6 +151,8 @@ pub trait Virgo<F: FieldImpl> {
         n: u32,
         slice_size: u32,
     ) -> IcicleResult<()>;
+
+    fn circuit_evaluate(circuit: &Circuit<F>, evaluations: &mut Vec<HostOrDeviceSlice<F>>) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -179,6 +240,14 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::hash_merkle_tree_slice(config, input, output, n, slice_size)
 }
 
+pub fn circuit_evaluate<F>(circuit: &Circuit<F>, evaluations: &mut Vec<HostOrDeviceSlice<F>>) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::circuit_evaluate(circuit, evaluations)
+}
+
 #[macro_export]
 macro_rules! impl_virgo {
     (
@@ -188,7 +257,9 @@ macro_rules! impl_virgo {
         $field_config:ident
       ) => {
         mod $field_prefix_ident {
-            use crate::virgo::{$field, $field_config, CudaError, DeviceContext, MerkleTreeConfig, SumcheckConfig};
+            use crate::virgo::{
+                $field, $field_config, Circuit, CudaError, DeviceContext, MerkleTreeConfig, SumcheckConfig,
+            };
 
             extern "C" {
                 #[link_name = concat!($field_prefix, "BkSumAllCase1")]
@@ -254,6 +325,14 @@ macro_rules! impl_virgo {
                     output: *mut $field,
                     n: u32,
                     slice_size: u32,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "CircuitEvaluate")]
+                pub(crate) fn _circuit_evaluate(
+                    circuit: &Circuit<$field>,
+                    evaluations: *const *mut $field,
                 ) -> CudaError;
             }
         }
@@ -353,6 +432,18 @@ macro_rules! impl_virgo {
                     )
                     .wrap()
                 }
+            }
+
+            fn circuit_evaluate(
+                circuit: &Circuit<$field>,
+                evaluations: &mut Vec<HostOrDeviceSlice<$field>>,
+            ) -> IcicleResult<()> {
+                let mut evaluations_ptr = vec![];
+                for i in 0..evaluations.len() {
+                    evaluations_ptr.push(evaluations[i].as_mut_ptr());
+                }
+
+                unsafe { $field_prefix_ident::_circuit_evaluate(circuit, evaluations_ptr.as_ptr()).wrap() }
             }
         }
     };

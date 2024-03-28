@@ -7,13 +7,22 @@ namespace virgo {
   // inv_r = 9915499612839321149637521777990102151350674507940716049588462388200839649614
   // inv_r2 = inv_r ^ 2 = 8519677608991584271437967308266649112183478179623991153221810821821888926024
   template <typename S>
-  __device__ constexpr S inv_r_mont = S({0x6db1194e, 0xdc5ba005, 0xe111ec87, 0x90ef5a9, 0xaeb85d5d, 0xc8260de4, 0x82c5551c, 0x15ebf951});
+  __device__ constexpr S inv_r_mont =
+    S({0x6db1194e, 0xdc5ba005, 0xe111ec87, 0x90ef5a9, 0xaeb85d5d, 0xc8260de4, 0x82c5551c, 0x15ebf951});
 
   template <typename S>
-  __device__ constexpr S inv_r_mont2 = S({0xd3c71148, 0xae12ba81, 0xb38e2428, 0x52f28270, 0x79a1edeb, 0xe065f3e3, 0xe436631e, 0x12d5f775});
+  __device__ constexpr S inv_r_mont2 =
+    S({0xd3c71148, 0xae12ba81, 0xb38e2428, 0x52f28270, 0x79a1edeb, 0xe065f3e3, 0xe436631e, 0x12d5f775});
+
+  __device__ void panic()
+  {
+    int* a = 0;
+    *a = 0;
+  }
 
   template <typename S>
-  void print_arr(S* arr, int start, int end) {
+  void print_arr(S* arr, int start, int end)
+  {
     int len = end - start;
     S* tmp = (S*)malloc(len * sizeof(S));
 
@@ -23,10 +32,11 @@ namespace virgo {
     }
     std::cout << std::endl;
 
-    delete [] tmp;
+    delete[] tmp;
   }
 
-  void print_u32_arr(uint32_t* arr, int start, int end) {
+  void print_u32_arr(uint32_t* arr, int start, int end)
+  {
     int len = end - start;
     uint32_t* tmp = (uint32_t*)malloc(len * sizeof(uint32_t));
 
@@ -36,10 +46,11 @@ namespace virgo {
     }
     std::cout << std::endl;
 
-    delete [] tmp;
+    delete[] tmp;
   }
 
-  std::tuple<int, int> find_thread_block(int n) {
+  std::tuple<int, int> find_thread_block(int n)
+  {
     int cuda_device_ix = 0;
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, cuda_device_ix);
@@ -58,6 +69,6 @@ namespace virgo {
 
     return std::make_tuple(num_blocks, num_threads);
   }
-}
+} // namespace virgo
 
 #endif

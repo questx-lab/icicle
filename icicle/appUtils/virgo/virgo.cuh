@@ -23,6 +23,6 @@ namespace virgo {
     S* mimc_params;
     uint32_t* D;
   };
-}
+} // namespace virgo
 
 #endif
