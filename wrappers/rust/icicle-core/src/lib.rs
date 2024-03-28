@@ -1,5 +1,6 @@
 pub mod curve;
 pub mod error;
+pub mod fft;
 pub mod field;
 pub mod msm;
 pub mod ntt;
@@ -10,6 +11,7 @@ pub mod tests;
 pub mod traits;
 pub mod tree;
 pub mod vec_ops;
+pub mod virgo;
 
 pub trait SNARKCurve: curve::Curve + msm::MSM<Self>
 where

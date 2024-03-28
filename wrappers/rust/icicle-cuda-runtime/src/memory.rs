@@ -138,6 +138,28 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
         Ok(())
     }
 
+    pub fn copy_from_host_partially(&mut self, val: &[T]) -> CudaResult<()> {
+        match self {
+            Self::Device(_, device_id) => check_device(*device_id),
+            Self::Host(_) => panic!("Need device memory to copy into, and not host"),
+        };
+        assert!(self.len() >= val.len(), "Destination has a larger size than source");
+
+        let size = size_of::<T>() * val.len();
+        if size != 0 {
+            unsafe {
+                cudaMemcpy(
+                    self.as_mut_ptr() as *mut c_void,
+                    val.as_ptr() as *const c_void,
+                    size,
+                    cudaMemcpyKind::cudaMemcpyHostToDevice,
+                )
+                .wrap()?
+            }
+        }
+        Ok(())
+    }
+
     pub fn copy_to_host(&self, val: &mut [T]) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
@@ -153,6 +175,28 @@ impl<'a, T> HostOrDeviceSlice<'a, T> {
                 cudaMemcpy(
                     val.as_mut_ptr() as *mut c_void,
                     self.as_ptr() as *const c_void,
+                    size,
+                    cudaMemcpyKind::cudaMemcpyDeviceToHost,
+                )
+                .wrap()?
+            }
+        }
+        Ok(())
+    }
+
+    pub fn copy_to_host_at_index(&self, val: &mut [T], val_index: usize, device_index: usize) -> CudaResult<()> {
+        match self {
+            Self::Device(_, device_id) => check_device(*device_id),
+            Self::Host(_) => panic!("Need device memory to copy from, and not host"),
+        };
+
+        let size = size_of::<T>();
+        if size != 0 {
+            unsafe {
+                cudaMemcpy(
+                    (val.as_mut_ptr() as *mut c_void).add(size * val_index),
+                    (self.as_ptr() as *const c_void).add(size * device_index),
+                    // self.as_ptr() as *const c_void,
                     size,
                     cudaMemcpyKind::cudaMemcpyDeviceToHost,
                 )
