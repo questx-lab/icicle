@@ -10,39 +10,55 @@ use std::ops::{Index, IndexMut, Range, RangeFrom, RangeFull, RangeInclusive, Ran
 use std::os::raw::c_void;
 use std::slice::from_raw_parts_mut;
 
-pub trait CudaAsPtr {
+pub trait ToCuda {
     type CudaRepr;
 
-    fn as_ptr(&self) -> *const Self::CudaRepr;
+    fn to_cuda(&self) -> Self::CudaRepr;
 }
 
-pub struct HostOrDeviceSliceWrapper<'a, W: CudaAsPtr> {
+pub struct HostOrDeviceSliceWrapper<'a, W: ToCuda> {
     // Hold the origin device slices to not drop them.
-    _origin: Vec<W>,
-    ptr: HostOrDeviceSlice<'a, *const W::CudaRepr>,
+    origin: Vec<W>,
+    ptr: HostOrDeviceSlice<'a, W::CudaRepr>,
 }
 
-impl<'a, W: CudaAsPtr> HostOrDeviceSliceWrapper<'a, W> {
+impl<'a, W: ToCuda> ToCuda for HostOrDeviceSliceWrapper<'a, W> {
+    type CudaRepr = *const W::CudaRepr;
+
+    fn to_cuda(&self) -> Self::CudaRepr {
+        self.as_ptr()
+    }
+}
+
+impl<'a, W: ToCuda> HostOrDeviceSliceWrapper<'a, W> {
     pub fn new(val: Vec<W>) -> Self {
         let mut origin_ptr = vec![];
         for i in 0..val.len() {
-            origin_ptr.push(val[i].as_ptr());
+            origin_ptr.push(val[i].to_cuda());
         }
 
         let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
 
-        Self { _origin: val, ptr }
+        Self { origin: val, ptr }
     }
 
-    pub fn as_ptr(&self) -> *const *const W::CudaRepr {
+    pub fn as_ptr(&self) -> *const W::CudaRepr {
         self.ptr
             .as_ptr()
     }
 }
 
+impl<'a, W: ToCuda> Index<usize> for HostOrDeviceSliceWrapper<'a, W> {
+    type Output = W;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.origin[index]
+    }
+}
+
 pub struct HostOrDeviceSlice2DConst<'a, T> {
     // Hold the origin device slices to not drop them.
-    _origin: Vec<HostOrDeviceSlice<'a, T>>,
+    origin: Vec<HostOrDeviceSlice<'a, T>>,
     ptr: HostOrDeviceSlice<'a, *const T>,
 }
 
@@ -59,7 +75,7 @@ impl<'a, T> HostOrDeviceSlice2DConst<'a, T> {
 
         let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
 
-        Self { _origin: origin, ptr }
+        Self { origin, ptr }
     }
 
     pub fn as_ptr(&self) -> *const *const T {
@@ -68,9 +84,17 @@ impl<'a, T> HostOrDeviceSlice2DConst<'a, T> {
     }
 }
 
+impl<'a, T> Index<usize> for HostOrDeviceSlice2DConst<'a, T> {
+    type Output = HostOrDeviceSlice<'a, T>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.origin[index]
+    }
+}
+
 pub struct HostOrDeviceSlice2DMut<'a, T> {
     // Hold the origin device slices to not drop them.
-    _origin: Vec<HostOrDeviceSlice<'a, T>>,
+    origin: Vec<HostOrDeviceSlice<'a, T>>,
     ptr: HostOrDeviceSlice<'a, *mut T>,
 }
 
@@ -87,12 +111,20 @@ impl<'a, T> HostOrDeviceSlice2DMut<'a, T> {
 
         let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
 
-        Self { _origin: origin, ptr }
+        Self { origin, ptr }
     }
 
     pub fn as_ptr(&self) -> *const *mut T {
         self.ptr
             .as_ptr()
+    }
+}
+
+impl<'a, T> Index<usize> for HostOrDeviceSlice2DMut<'a, T> {
+    type Output = HostOrDeviceSlice<'a, T>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.origin[index]
     }
 }
 

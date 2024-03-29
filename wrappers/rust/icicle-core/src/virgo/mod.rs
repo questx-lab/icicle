@@ -49,6 +49,8 @@ impl<'a, F: FieldImpl> MerkleTreeConfig<'a, F> {
 
 ///////////// CIRCUIT
 
+#[repr(C)]
+#[derive(Debug, Clone)]
 pub struct SparseMultilinearExtension<F: FieldImpl> {
     pub size: u32,
 
@@ -71,39 +73,41 @@ pub struct SparseMultilinearExtension<F: FieldImpl> {
     pub y_indices: *const *const u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone)]
 pub struct ReverseSparseMultilinearExtension<F: FieldImpl> {
     pub size: u32,
 
-    pub z_num_vars: u32,
-    pub x_num_vars: u32,
+    pub subset_num_vars: u32,
+    pub real_num_vars: u32,
 
-    pub point_z: *const u32,
-    pub point_x: *const u32,
+    pub point_subset: *const u32,
+    pub point_real: *const u32,
     pub evaluations: *const F,
 
-    pub z_indices_size: *const u8,
-    pub z_indices: *const *const u32,
-
-    pub x_indices_size: *const u8,
-    pub x_indices: *const *const u32,
+    pub subset_position: *const u32,
+    pub real_position: *const u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone)]
 pub struct Layer<F: FieldImpl> {
     pub layer_index: u8,
     pub num_layers: u8,
+    pub size: u32,
 
-    pub constant_ext: *const *const SparseMultilinearExtension<F>,
-    pub mul_ext: *const *const SparseMultilinearExtension<F>,
-    pub forward_x_ext: *const *const SparseMultilinearExtension<F>,
-    pub forward_y_ext: *const *const SparseMultilinearExtension<F>,
-
-    pub reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
+    pub constant_ext: *const SparseMultilinearExtension<F>,
+    pub mul_ext: *const SparseMultilinearExtension<F>,
+    pub forward_x_ext: *const SparseMultilinearExtension<F>,
+    pub forward_y_ext: *const SparseMultilinearExtension<F>,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone)]
 pub struct Circuit<F: FieldImpl> {
     pub num_layers: u8,
     pub layers: *const Layer<F>,
-    pub input_reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
+    pub reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
 }
 
 /////////////

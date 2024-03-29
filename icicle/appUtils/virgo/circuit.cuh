@@ -40,19 +40,19 @@ namespace virgo {
   struct ReverseSparseMultilinearExtension {
     uint32_t size;
 
-    uint32_t z_num_vars;
-    uint32_t x_num_vars;
+    uint32_t subset_num_vars;
+    uint32_t real_num_vars;
 
     // mle(z[i], x[i]) = evaluations[i].
-    uint32_t* point_z;
-    uint32_t* point_x;
+    uint32_t* point_subset;
+    uint32_t* point_real;
     S* evaluations;
 
-    uint8_t* z_indices_size;
-    uint32_t** z_indices; // z_indexes[i][.] are the indices of z==i in point_z.
-
-    uint8_t* x_indices_size;
-    uint32_t** x_indices; // x_indexes[i][.] are the indices of x==i in point_x.
+    // Reverse extension is a mapping of subset_index to real_index.
+    // It exists exact ONE z and ONE x in the all mle points. So we don't need
+    // to design this mle as the same as SparseMLE.
+    uint32_t* subset_position; // z_index[i] are the index of z==i in point_z.
+    uint32_t* real_position;   // x_index[i] are the index of x==i in point_x.
   };
 
   template <typename S>
@@ -60,13 +60,12 @@ namespace virgo {
     // These two attributes are used to compute size of extensions.
     uint8_t layer_index;
     uint8_t num_layers;
+    uint32_t size;
 
-    // This is a one-dimmension array of pointers, NOT a two-dimmension array.
-    SparseMultilinearExtension<S>** constant_ext;
-    SparseMultilinearExtension<S>** mul_ext;
-    SparseMultilinearExtension<S>** forward_x_ext;
-    SparseMultilinearExtension<S>** forward_y_ext;
-    ReverseSparseMultilinearExtension<S>** reverse_ext;
+    SparseMultilinearExtension<S>* constant_ext;
+    SparseMultilinearExtension<S>* mul_ext;
+    SparseMultilinearExtension<S>* forward_x_ext;
+    SparseMultilinearExtension<S>* forward_y_ext;
   };
 
   template <typename S>
@@ -74,8 +73,9 @@ namespace virgo {
     uint8_t num_layers;
     Layer<S>* layers;
 
-    // This is a one-dimmension array of pointers, NOT a two-dimmension array.
-    ReverseSparseMultilinearExtension<S>** input_reverse_ext;
+    // reverse_ext[target_layer_index][source_layer_index]
+    // Mapping subset_index - real_index
+    ReverseSparseMultilinearExtension<S>** reverse_ext;
   };
 
 } // namespace virgo
