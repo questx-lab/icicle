@@ -49,7 +49,7 @@ mod test {
         (a, b)
     }
 
-    fn arks_to_icicles_device(arr1: &Vec<ArkFrBN254>) -> HostOrDeviceSlice<'static, IcicleFrBN254> {
+    fn arks_to_icicles_device(arr1: &Vec<ArkFrBN254>) -> HostOrDeviceSlice<IcicleFrBN254> {
         let n = arr1.len();
         let mut a_slice = HostOrDeviceSlice::cuda_malloc(n).unwrap();
         let a: Vec<IcicleFrBN254> = cfg_into_iter!(&arr1)
@@ -62,7 +62,7 @@ mod test {
         a_slice
     }
 
-    fn u32s_to_device(arr1: &Vec<u32>) -> HostOrDeviceSlice<'static, u32> {
+    fn u32s_to_device(arr1: &Vec<u32>) -> HostOrDeviceSlice<u32> {
         let mut a_slice = HostOrDeviceSlice::cuda_malloc(arr1.len()).unwrap();
         a_slice
             .copy_from_host(&arr1)
@@ -71,7 +71,7 @@ mod test {
         a_slice
     }
 
-    fn icicles_to_arks(result_slice: &HostOrDeviceSlice<'static, IcicleFrBN254>, n: usize) -> Vec<ArkFrBN254> {
+    fn icicles_to_arks(result_slice: &HostOrDeviceSlice<IcicleFrBN254>, n: usize) -> Vec<ArkFrBN254> {
         let mut result_mont = vec![IcicleFrBN254::zero(); n];
         result_slice
             .copy_to_host(&mut result_mont)
@@ -248,12 +248,7 @@ mod test {
         assert_eq!(expected, actual);
     }
 
-    fn get_merkle_tree(
-        input: &Vec<ArkFrBN254>,
-    ) -> (
-        MerkleTreeConfig<IcicleFrBN254>,
-        HostOrDeviceSlice<'static, IcicleFrBN254>,
-    ) {
+    fn get_merkle_tree(input: &Vec<ArkFrBN254>) -> (MerkleTreeConfig<IcicleFrBN254>, HostOrDeviceSlice<IcicleFrBN254>) {
         let n = input.len();
         let mut tree_slice = HostOrDeviceSlice::cuda_malloc(2 * n - 1).unwrap();
         let a: Vec<IcicleFrBN254> = cfg_into_iter!(&input)
