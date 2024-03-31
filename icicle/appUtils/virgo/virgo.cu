@@ -63,4 +63,13 @@ namespace virgo {
   {
     return circuit_evaluate<curve_config::scalar_t>(circuit, evaluations);
   }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, CircuitSubsetEvaluations)(
+    const virgo::Circuit<curve_config::scalar_t>& circuit,
+    uint8_t layer_index,
+    curve_config::scalar_t** evaluations,
+    curve_config::scalar_t** subset_evaluations)
+  {
+    return circuit_subset_evaluations<curve_config::scalar_t>(circuit, layer_index, evaluations, subset_evaluations);
+  }
 } // namespace virgo

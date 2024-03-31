@@ -75,7 +75,7 @@ pub struct SparseMultilinearExtension<F: FieldImpl> {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct ReverseSparseMultilinearExtension<F: FieldImpl> {
+pub struct ReverseSparseMultilinearExtension {
     pub size: u32,
 
     pub subset_num_vars: u32,
@@ -83,7 +83,6 @@ pub struct ReverseSparseMultilinearExtension<F: FieldImpl> {
 
     pub point_subset: *const u32,
     pub point_real: *const u32,
-    pub evaluations: *const F,
 
     pub subset_position: *const u32,
     pub real_position: *const u32,
@@ -107,7 +106,8 @@ pub struct Layer<F: FieldImpl> {
 pub struct Circuit<F: FieldImpl> {
     pub num_layers: u8,
     pub layers: *const Layer<F>,
-    pub reverse_ext: *const *const ReverseSparseMultilinearExtension<F>,
+    pub on_host_subset_num_vars: *const *const u32,
+    pub reverse_exts: *const *const ReverseSparseMultilinearExtension,
 }
 
 /////////////
@@ -157,6 +157,12 @@ pub trait Virgo<F: FieldImpl> {
     ) -> IcicleResult<()>;
 
     fn circuit_evaluate(circuit: &Circuit<F>, evaluations: &HostOrDeviceSlice2DMut<F>) -> IcicleResult<()>;
+    fn circuit_subset_evaluations(
+        circuit: &Circuit<F>,
+        layer_index: u8,
+        evaluations: &HostOrDeviceSlice2DMut<F>,
+        subset_evaluations: &HostOrDeviceSlice2DMut<F>,
+    ) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -252,6 +258,24 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::circuit_evaluate(circuit, evaluations)
 }
 
+pub fn circuit_subset_evaluations<F>(
+    circuit: &Circuit<F>,
+    layer_index: u8,
+    evaluations: &HostOrDeviceSlice2DMut<F>,
+    subset_evaluations: &HostOrDeviceSlice2DMut<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::circuit_subset_evaluations(
+        circuit,
+        layer_index,
+        evaluations,
+        subset_evaluations,
+    )
+}
+
 #[macro_export]
 macro_rules! impl_virgo {
     (
@@ -337,6 +361,16 @@ macro_rules! impl_virgo {
                 pub(crate) fn _circuit_evaluate(
                     circuit: &Circuit<$field>,
                     evaluations: *const *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "CircuitSubsetEvaluations")]
+                pub(crate) fn _circuit_subset_evaluations(
+                    circuit: &Circuit<$field>,
+                    layer_index: u8,
+                    evaluations: *const *mut $field,
+                    subset_evaluations: *const *mut $field,
                 ) -> CudaError;
             }
         }
@@ -443,6 +477,23 @@ macro_rules! impl_virgo {
                 evaluations: &HostOrDeviceSlice2DMut<$field>,
             ) -> IcicleResult<()> {
                 unsafe { $field_prefix_ident::_circuit_evaluate(circuit, evaluations.as_ptr()).wrap() }
+            }
+
+            fn circuit_subset_evaluations(
+                circuit: &Circuit<$field>,
+                layer_index: u8,
+                evaluations: &HostOrDeviceSlice2DMut<$field>,
+                subset_evaluations: &HostOrDeviceSlice2DMut<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_circuit_subset_evaluations(
+                        circuit,
+                        layer_index,
+                        evaluations.as_ptr(),
+                        subset_evaluations.as_ptr(),
+                    )
+                    .wrap()
+                }
             }
         }
     };

@@ -36,7 +36,6 @@ namespace virgo {
     uint32_t** y_indices; // y_indexes[i][.] are the indices of y==i in point_y.
   };
 
-  template <typename S>
   struct ReverseSparseMultilinearExtension {
     uint32_t size;
 
@@ -46,7 +45,6 @@ namespace virgo {
     // mle(z[i], x[i]) = evaluations[i].
     uint32_t* point_subset;
     uint32_t* point_real;
-    S* evaluations;
 
     // Reverse extension is a mapping of subset_index to real_index.
     // It exists exact ONE z and ONE x in the all mle points. So we don't need
@@ -73,9 +71,12 @@ namespace virgo {
     uint8_t num_layers;
     Layer<S>* layers;
 
+    // subset_num_vars[target_layer_index][source_layer_index] = reverse_ext.subset_num_vars.
+    uint32_t** on_host_subset_num_vars;
+
     // reverse_ext[target_layer_index][source_layer_index]
     // Mapping subset_index - real_index
-    ReverseSparseMultilinearExtension<S>** reverse_ext;
+    ReverseSparseMultilinearExtension** reverse_exts;
   };
 
 } // namespace virgo

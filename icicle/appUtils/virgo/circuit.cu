@@ -33,7 +33,7 @@ namespace virgo {
     uint32_t size,
     uint8_t gate_type,
     SparseMultilinearExtension<S>* ext,
-    ReverseSparseMultilinearExtension<S>** reverse_exts,
+    ReverseSparseMultilinearExtension** reverse_exts,
     S** evaluations)
   {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -71,8 +71,8 @@ namespace virgo {
   cudaError_t layer_evaluate(
     uint8_t num_layers,
     uint8_t layer_index,
-    Layer<S>& layer,
-    ReverseSparseMultilinearExtension<S>** reverse_exts,
+    const Layer<S>& layer,
+    ReverseSparseMultilinearExtension** reverse_exts,
     S** evaluations)
   {
     CHK_INIT_IF_RETURN();
@@ -99,7 +99,47 @@ namespace virgo {
   cudaError_t circuit_evaluate(const Circuit<S>& circuit, S** evaluations)
   {
     for (int8_t layer_index = circuit.num_layers - 1; layer_index >= 0; layer_index--) {
-      layer_evaluate(circuit.num_layers, layer_index, circuit.layers[layer_index], circuit.reverse_ext, evaluations);
+      layer_evaluate(circuit.num_layers, layer_index, circuit.layers[layer_index], circuit.reverse_exts, evaluations);
+    }
+
+    return CHK_LAST();
+  }
+
+  template <typename S>
+  __global__ void extract_subset_evaluation(
+    ReverseSparseMultilinearExtension** reverse_exts,
+    uint8_t source_layer_index,
+    uint8_t target_layer_index,
+    S** evaluations,
+    S** subset_evaluations)
+  {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+    uint32_t subset_index = tid;
+
+    ReverseSparseMultilinearExtension reverse_ext = reverse_exts[target_layer_index][source_layer_index];
+
+    // This tid
+    uint32_t point_position = reverse_ext.subset_position[subset_index];
+    if (point_position == 4294967295) { return; }
+
+    uint32_t real_index = reverse_ext.point_real[point_position];
+    subset_evaluations[target_layer_index - source_layer_index - 1][subset_index] =
+      evaluations[target_layer_index][real_index];
+  }
+
+  template <typename S>
+  cudaError_t
+  circuit_subset_evaluations(const Circuit<S>& circuit, uint8_t layer_index, S** evaluations, S** subset_evaluations)
+  {
+    CHK_INIT_IF_RETURN();
+
+    for (uint8_t target_layer_index = layer_index + 1; target_layer_index < circuit.num_layers + 1;
+         target_layer_index++) {
+      auto [num_blocks, num_threads] =
+        find_thread_block(1 << circuit.on_host_subset_num_vars[target_layer_index][layer_index]);
+
+      extract_subset_evaluation<<<num_blocks, num_threads>>>(
+        circuit.reverse_exts, layer_index, target_layer_index, evaluations, subset_evaluations);
     }
 
     return CHK_LAST();

@@ -1,5 +1,5 @@
 use crate::bindings::{
-    cudaFree, cudaMalloc, cudaMallocAsync, cudaMemPool_t, cudaMemcpy, cudaMemcpyAsync, cudaMemcpyKind,
+    cudaError, cudaFree, cudaMalloc, cudaMallocAsync, cudaMemPool_t, cudaMemcpy, cudaMemcpyAsync, cudaMemcpyKind,
 };
 use crate::device::get_device;
 use crate::device_context::check_device;
@@ -8,7 +8,6 @@ use crate::stream::CudaStream;
 use std::mem::{size_of, MaybeUninit};
 use std::ops::{Index, IndexMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 use std::os::raw::c_void;
-use std::slice::from_raw_parts_mut;
 
 pub trait ToCuda {
     type CudaRepr;
@@ -82,6 +81,16 @@ impl<T> HostOrDeviceSlice2DConst<T> {
         self.ptr
             .as_ptr()
     }
+
+    pub fn len(&self) -> usize {
+        self.origin
+            .len()
+    }
+
+    pub fn into_iter(self) -> std::vec::IntoIter<HostOrDeviceSlice<T>> {
+        self.origin
+            .into_iter()
+    }
 }
 
 impl<T> Index<usize> for HostOrDeviceSlice2DConst<T> {
@@ -117,6 +126,16 @@ impl<T> HostOrDeviceSlice2DMut<T> {
     pub fn as_ptr(&self) -> *const *mut T {
         self.ptr
             .as_ptr()
+    }
+
+    pub fn len(&self) -> usize {
+        self.origin
+            .len()
+    }
+
+    pub fn into_iter(self) -> std::vec::IntoIter<HostOrDeviceSlice<T>> {
+        self.origin
+            .into_iter()
     }
 }
 
@@ -357,13 +376,14 @@ impl<T> HostOrDeviceSlice<T> {
             Self::Host(_) => panic!("Need device memory to copy from, and not host"),
         };
 
-        let size = size_of::<T>();
+        let size = size_of::<T>() * val.len();
         if size != 0 {
             unsafe {
                 cudaMemcpy(
-                    (val.as_mut_ptr() as *mut c_void).add(size * val_index),
-                    (self.as_ptr() as *const c_void).add(size * device_index),
-                    // self.as_ptr() as *const c_void,
+                    val.as_mut_ptr()
+                        .wrapping_add(val_index) as *mut c_void,
+                    self.as_ptr()
+                        .wrapping_add(device_index) as *const c_void,
                     size,
                     cudaMemcpyKind::cudaMemcpyDeviceToHost,
                 )
@@ -424,6 +444,36 @@ impl<T> HostOrDeviceSlice<T> {
     }
 }
 
+impl<T: Clone> Clone for HostOrDeviceSlice<T> {
+    fn clone(&self) -> Self {
+        match self {
+            HostOrDeviceSlice::Host(v) => Self::Host(v.to_vec()),
+            HostOrDeviceSlice::Device(s, device_id) => match s {
+                None => Self::Device(None, device_id.clone()),
+                Some((pointer, size)) => {
+                    let mut new = HostOrDeviceSlice::cuda_malloc(*size).unwrap();
+
+                    let count = size_of::<T>() * self.len();
+                    unsafe {
+                        let err = cudaMemcpy(
+                            new.as_mut_ptr() as *mut c_void,
+                            *pointer as *const c_void,
+                            count,
+                            cudaMemcpyKind::cudaMemcpyDeviceToDevice,
+                        );
+
+                        if err != cudaError::cudaSuccess {
+                            panic!("failed to clone device memory {:?}", err);
+                        }
+                    }
+
+                    new
+                }
+            },
+        }
+    }
+}
+
 macro_rules! impl_index {
     ($($t:ty)*) => {
         $(
@@ -451,6 +501,9 @@ macro_rules! impl_index {
         )*
     }
 }
+
+unsafe impl<T> Send for HostOrDeviceSlice<T> {}
+unsafe impl<T> Sync for HostOrDeviceSlice<T> {}
 
 impl_index! {
     Range<usize>
