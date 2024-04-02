@@ -63,14 +63,14 @@ pub struct SparseMultilinearExtension<F: FieldImpl> {
     pub point_y: *const u32,
     pub evaluations: *const F,
 
-    pub z_indices_size: *const u8,
-    pub z_indices: *const *const u32,
+    pub z_indices_start: *const u32,
+    pub z_indices: *const u32,
 
-    pub x_indices_size: *const u8,
-    pub x_indices: *const *const u32,
+    pub x_indices_start: *const u32,
+    pub x_indices: *const u32,
 
-    pub y_indices_size: *const u8,
-    pub y_indices: *const *const u32,
+    pub y_indices_start: *const u32,
+    pub y_indices: *const u32,
 }
 
 #[repr(C)]

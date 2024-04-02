@@ -47,8 +47,13 @@ namespace virgo {
       SparseMultilinearExtension<S> target_ext = ext[ext_index];
       uint32_t next_layer_size = 1 << target_ext.x_num_vars;
 
-      for (uint8_t i = 0; i < target_ext.z_indices_size[relative_z_index]; i++) {
-        uint32_t k = target_ext.z_indices[relative_z_index][i];
+      uint32_t start = target_ext.z_indices_start[relative_z_index];
+      uint32_t end = target_ext.z_indices_start[relative_z_index + 1];
+
+      for (uint8_t i = start; i < end; i++) {
+        uint32_t k = target_ext.z_indices[i];
+
+        printf("type=%d k=%d i=%d expected=%d  got=%d\n", gate_type, k, i, target_ext.point_z[k], relative_z_index);
 
         if (target_ext.point_z[k] != relative_z_index) { panic(); }
 
@@ -106,9 +111,12 @@ namespace virgo {
   cudaError_t circuit_evaluate(const Circuit<S>& circuit, uint32_t num_subcircuits, S** evaluations)
   {
     for (int8_t layer_index = circuit.num_layers - 1; layer_index >= 0; layer_index--) {
+      printf("LAYERXXXXXXXXXXXXXXXXX %d\n", layer_index);
       layer_evaluate(
         num_subcircuits, circuit.num_layers, layer_index, circuit.layers[layer_index], circuit.reverse_exts,
         evaluations);
+
+      if (layer_index == 2) { break; }
     }
 
     return CHK_LAST();

@@ -26,14 +26,18 @@ namespace virgo {
     uint32_t* point_y;
     S* evaluations;
 
-    uint8_t* z_indices_size;
-    uint32_t** z_indices; // z_indexes[i][.] are the indices of z==i in point_z.
+    // start = *_indices_size[k];
+    // end   = *_indices_size[k+1];
+    // *_indices[start..end] are the indices of *==i in point_*.
 
-    uint8_t* x_indices_size;
-    uint32_t** x_indices; // x_indexes[i][.] are the indices of x==i in point_x.
+    uint32_t* z_indices_start;
+    uint32_t* z_indices; // z_indexes[i][.] are the indices of z==i in point_z.
 
-    uint8_t* y_indices_size;
-    uint32_t** y_indices; // y_indexes[i][.] are the indices of y==i in point_y.
+    uint32_t* x_indices_start;
+    uint32_t* x_indices; // x_indexes[i][.] are the indices of x==i in point_x.
+
+    uint32_t* y_indices_start;
+    uint32_t* y_indices; // y_indexes[i][.] are the indices of y==i in point_y.
   };
 
   struct ReverseSparseMultilinearExtension {
