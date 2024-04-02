@@ -1,5 +1,6 @@
 use crate::bindings::{
     cudaError, cudaFree, cudaMalloc, cudaMallocAsync, cudaMemPool_t, cudaMemcpy, cudaMemcpyAsync, cudaMemcpyKind,
+    cudaMemset,
 };
 use crate::device::get_device;
 use crate::device_context::check_device;
@@ -30,15 +31,15 @@ impl<W: ToCuda> ToCuda for HostOrDeviceSliceWrapper<W> {
 }
 
 impl<W: ToCuda> HostOrDeviceSliceWrapper<W> {
-    pub fn new(val: Vec<W>) -> Self {
+    pub fn new(val: Vec<W>) -> CudaResult<Self> {
         let mut origin_ptr = vec![];
         for i in 0..val.len() {
             origin_ptr.push(val[i].to_cuda());
         }
 
-        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+        let ptr = HostOrDeviceSlice::on_device(&origin_ptr)?;
 
-        Self { origin: val, ptr }
+        Ok(Self { origin: val, ptr })
     }
 
     pub fn as_ptr(&self) -> *const W::CudaRepr {
@@ -55,29 +56,53 @@ impl<'a, W: ToCuda> Index<usize> for HostOrDeviceSliceWrapper<W> {
     }
 }
 
-pub struct HostOrDeviceSlice2DConst<T> {
+pub struct HostOrDeviceSlice2D<T> {
     // Hold the origin device slices to not drop them.
     origin: Vec<HostOrDeviceSlice<T>>,
-    ptr: HostOrDeviceSlice<*const T>,
+    ptr: HostOrDeviceSlice<*mut T>,
 }
 
-impl<T> HostOrDeviceSlice2DConst<T> {
-    pub fn new(val: Vec<Vec<T>>) -> Self {
+impl<T> HostOrDeviceSlice2D<T> {
+    pub fn zeros(size: Vec<usize>) -> CudaResult<Self> {
         let mut origin = vec![];
-        let mut origin_ptr = vec![];
-        for i in 0..val.len() {
-            let device = HostOrDeviceSlice::on_device(&val[i]);
+        let mut mut_origin_ptr = vec![];
+        for i in 0..size.len() {
+            let mut device = if size[i] > 0 {
+                HostOrDeviceSlice::zeros_on_device(size[i])?
+            } else {
+                HostOrDeviceSlice::on_host(vec![])
+            };
 
-            origin_ptr.push(device.as_ptr());
+            mut_origin_ptr.push(device.as_mut_ptr());
             origin.push(device);
         }
 
-        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+        let mut_ptr = HostOrDeviceSlice::on_device(&mut_origin_ptr)?;
 
-        Self { origin, ptr }
+        Ok(Self { origin, ptr: mut_ptr })
     }
 
-    pub fn as_ptr(&self) -> *const *const T {
+    pub fn new(val: Vec<Vec<T>>) -> CudaResult<Self> {
+        let mut origin = vec![];
+        let mut mut_origin_ptr = vec![];
+        for i in 0..val.len() {
+            let mut device = HostOrDeviceSlice::on_device(&val[i])?;
+
+            mut_origin_ptr.push(device.as_mut_ptr());
+            origin.push(device);
+        }
+
+        let mut_ptr = HostOrDeviceSlice::on_device(&mut_origin_ptr)?;
+
+        Ok(Self { origin, ptr: mut_ptr })
+    }
+
+    pub fn as_ptr_const_inner(&self) -> *const *const T {
+        self.ptr
+            .as_ptr() as *const *const T
+    }
+
+    pub fn as_ptr_mut_inner(&self) -> *const *mut T {
         self.ptr
             .as_ptr()
     }
@@ -87,13 +112,22 @@ impl<T> HostOrDeviceSlice2DConst<T> {
             .len()
     }
 
+    pub fn iter(&self) -> std::slice::Iter<'_, HostOrDeviceSlice<T>> {
+        self.origin
+            .iter()
+    }
+
     pub fn into_iter(self) -> std::vec::IntoIter<HostOrDeviceSlice<T>> {
         self.origin
             .into_iter()
     }
+
+    pub fn at_mut(&mut self, index: usize) -> &mut HostOrDeviceSlice<T> {
+        &mut self.origin[index]
+    }
 }
 
-impl<T> Index<usize> for HostOrDeviceSlice2DConst<T> {
+impl<T> Index<usize> for HostOrDeviceSlice2D<T> {
     type Output = HostOrDeviceSlice<T>;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -101,29 +135,49 @@ impl<T> Index<usize> for HostOrDeviceSlice2DConst<T> {
     }
 }
 
-pub struct HostOrDeviceSlice2DMut<T> {
+pub struct HostOrDeviceSlice3D<T> {
     // Hold the origin device slices to not drop them.
-    origin: Vec<HostOrDeviceSlice<T>>,
-    ptr: HostOrDeviceSlice<*mut T>,
+    origin: Vec<HostOrDeviceSlice2D<T>>,
+    ptr: HostOrDeviceSlice<*const *mut T>,
 }
 
-impl<T> HostOrDeviceSlice2DMut<T> {
-    pub fn new(val: Vec<Vec<T>>) -> Self {
+impl<T> HostOrDeviceSlice3D<T> {
+    pub fn zeros(size: Vec<Vec<usize>>) -> CudaResult<Self> {
         let mut origin = vec![];
-        let mut origin_ptr = vec![];
-        for i in 0..val.len() {
-            let mut device = HostOrDeviceSlice::on_device(&val[i]);
+        let mut mut_origin_ptr = vec![];
+        for subsize in size {
+            let device = HostOrDeviceSlice2D::zeros(subsize)?;
 
-            origin_ptr.push(device.as_mut_ptr());
+            mut_origin_ptr.push(device.as_ptr_mut_inner());
             origin.push(device);
         }
 
-        let ptr = HostOrDeviceSlice::on_device(&origin_ptr);
+        let mut_ptr = HostOrDeviceSlice::on_device(&mut_origin_ptr)?;
 
-        Self { origin, ptr }
+        Ok(Self { origin, ptr: mut_ptr })
     }
 
-    pub fn as_ptr(&self) -> *const *mut T {
+    pub fn new(val: Vec<Vec<Vec<T>>>) -> CudaResult<Self> {
+        let mut origin = vec![];
+        let mut ptr = vec![];
+        for v2d in val {
+            let device = HostOrDeviceSlice2D::new(v2d)?;
+
+            ptr.push(device.as_ptr_mut_inner());
+            origin.push(device);
+        }
+
+        let ptr = HostOrDeviceSlice::on_device(&ptr)?;
+
+        Ok(Self { origin, ptr })
+    }
+
+    pub fn as_ptr_const_inner(&self) -> *const *const *const T {
+        self.ptr
+            .as_ptr() as *const *const *const T
+    }
+
+    pub fn as_ptr_mut_inner(&self) -> *const *const *mut T {
         self.ptr
             .as_ptr()
     }
@@ -133,14 +187,23 @@ impl<T> HostOrDeviceSlice2DMut<T> {
             .len()
     }
 
-    pub fn into_iter(self) -> std::vec::IntoIter<HostOrDeviceSlice<T>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, HostOrDeviceSlice2D<T>> {
+        self.origin
+            .iter()
+    }
+
+    pub fn into_iter(self) -> std::vec::IntoIter<HostOrDeviceSlice2D<T>> {
         self.origin
             .into_iter()
     }
+
+    pub fn at_mut(&mut self, index: usize) -> &mut HostOrDeviceSlice2D<T> {
+        &mut self.origin[index]
+    }
 }
 
-impl<T> Index<usize> for HostOrDeviceSlice2DMut<T> {
-    type Output = HostOrDeviceSlice<T>;
+impl<T> Index<usize> for HostOrDeviceSlice3D<T> {
+    type Output = HostOrDeviceSlice2D<T>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.origin[index]
@@ -243,15 +306,23 @@ impl<T> HostOrDeviceSlice<T> {
         }
     }
 
-    pub fn on_device<'b>(v: &'b [T]) -> HostOrDeviceSlice<T> {
+    pub fn on_device<'b>(v: &'b [T]) -> CudaResult<Self> {
         let mut device = HostOrDeviceSlice::cuda_malloc(v.len()).unwrap();
         if v.len() > 0 {
-            device
-                .copy_from_host(v)
-                .unwrap();
+            device.copy_from_host(v)?;
         }
 
-        device
+        Ok(device)
+    }
+
+    pub fn zeros_on_device(count: usize) -> CudaResult<HostOrDeviceSlice<T>> {
+        let mut device = HostOrDeviceSlice::cuda_malloc(count).unwrap();
+        let size = count * size_of::<T>();
+        unsafe {
+            cudaMemset(device.as_mut_ptr() as *mut c_void, 0, size).wrap()?;
+        };
+
+        Ok(device)
     }
 
     pub fn on_host(src: Vec<T>) -> Self {
@@ -324,18 +395,22 @@ impl<T> HostOrDeviceSlice<T> {
         Ok(())
     }
 
-    pub fn copy_from_host_partially(&mut self, val: &[T]) -> CudaResult<()> {
+    pub fn copy_from_host_partially(&mut self, val: &[T], dst_index: usize) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy into, and not host"),
         };
-        assert!(self.len() >= val.len(), "Destination has a larger size than source");
+        assert!(
+            self.len() - dst_index >= val.len(),
+            "Destination has a larger size than source"
+        );
 
         let size = size_of::<T>() * val.len();
         if size != 0 {
             unsafe {
                 cudaMemcpy(
-                    self.as_mut_ptr() as *mut c_void,
+                    self.as_mut_ptr()
+                        .wrapping_add(dst_index) as *mut c_void,
                     val.as_ptr() as *const c_void,
                     size,
                     cudaMemcpyKind::cudaMemcpyHostToDevice,
@@ -370,7 +445,7 @@ impl<T> HostOrDeviceSlice<T> {
         Ok(())
     }
 
-    pub fn copy_to_host_at_index(&self, val: &mut [T], val_index: usize, device_index: usize) -> CudaResult<()> {
+    pub fn copy_to_host_partially(&self, val: &mut [T], device_index: usize) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy from, and not host"),
@@ -380,8 +455,7 @@ impl<T> HostOrDeviceSlice<T> {
         if size != 0 {
             unsafe {
                 cudaMemcpy(
-                    val.as_mut_ptr()
-                        .wrapping_add(val_index) as *mut c_void,
+                    val.as_mut_ptr() as *mut c_void,
                     self.as_ptr()
                         .wrapping_add(device_index) as *const c_void,
                     size,

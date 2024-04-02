@@ -1,5 +1,5 @@
 use icicle_cuda_runtime::device_context::{DeviceContext, DEFAULT_DEVICE_ID};
-use icicle_cuda_runtime::memory::{HostOrDeviceSlice, HostOrDeviceSlice2DMut};
+use icicle_cuda_runtime::memory::{HostOrDeviceSlice, HostOrDeviceSlice2D};
 
 use crate::{error::IcicleResult, traits::FieldImpl};
 
@@ -156,13 +156,20 @@ pub trait Virgo<F: FieldImpl> {
         slice_size: u32,
     ) -> IcicleResult<()>;
 
-    fn circuit_evaluate(circuit: &Circuit<F>, evaluations: &HostOrDeviceSlice2DMut<F>) -> IcicleResult<()>;
+    fn circuit_evaluate(
+        circuit: &Circuit<F>,
+        num_circuits: usize,
+        evaluations: &HostOrDeviceSlice2D<F>,
+    ) -> IcicleResult<()>;
     fn circuit_subset_evaluations(
         circuit: &Circuit<F>,
+        num_circuits: usize,
         layer_index: u8,
-        evaluations: &HostOrDeviceSlice2DMut<F>,
-        subset_evaluations: &HostOrDeviceSlice2DMut<F>,
+        evaluations: &HostOrDeviceSlice2D<F>,
+        subset_evaluations: &HostOrDeviceSlice2D<F>,
     ) -> IcicleResult<()>;
+
+    fn mul_by_scalar(arr: &mut HostOrDeviceSlice<F>, scalar: F, n: u32) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -232,7 +239,9 @@ where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
 {
-    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n)
+    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n)?;
+
+    Ok(())
 }
 
 pub fn hash_merkle_tree_slice<F>(
@@ -250,19 +259,24 @@ where
     <<F as FieldImpl>::Config as Virgo<F>>::hash_merkle_tree_slice(config, input, output, n, slice_size)
 }
 
-pub fn circuit_evaluate<F>(circuit: &Circuit<F>, evaluations: &HostOrDeviceSlice2DMut<F>) -> IcicleResult<()>
+pub fn circuit_evaluate<F>(
+    circuit: &Circuit<F>,
+    num_circuits: usize,
+    evaluations: &HostOrDeviceSlice2D<F>,
+) -> IcicleResult<()>
 where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
 {
-    <<F as FieldImpl>::Config as Virgo<F>>::circuit_evaluate(circuit, evaluations)
+    <<F as FieldImpl>::Config as Virgo<F>>::circuit_evaluate(circuit, num_circuits, evaluations)
 }
 
 pub fn circuit_subset_evaluations<F>(
     circuit: &Circuit<F>,
+    num_circuits: usize,
     layer_index: u8,
-    evaluations: &HostOrDeviceSlice2DMut<F>,
-    subset_evaluations: &HostOrDeviceSlice2DMut<F>,
+    evaluations: &HostOrDeviceSlice2D<F>,
+    subset_evaluations: &HostOrDeviceSlice2D<F>,
 ) -> IcicleResult<()>
 where
     F: FieldImpl,
@@ -270,10 +284,19 @@ where
 {
     <<F as FieldImpl>::Config as Virgo<F>>::circuit_subset_evaluations(
         circuit,
+        num_circuits,
         layer_index,
         evaluations,
         subset_evaluations,
     )
+}
+
+pub fn mul_by_scalar<F>(arr: &mut HostOrDeviceSlice<F>, scalar: F, n: u32) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::mul_by_scalar(arr, scalar, n)
 }
 
 #[macro_export]
@@ -360,6 +383,7 @@ macro_rules! impl_virgo {
                 #[link_name = concat!($field_prefix, "CircuitEvaluate")]
                 pub(crate) fn _circuit_evaluate(
                     circuit: &Circuit<$field>,
+                    num_subcircuits: u32,
                     evaluations: *const *mut $field,
                 ) -> CudaError;
             }
@@ -368,10 +392,16 @@ macro_rules! impl_virgo {
                 #[link_name = concat!($field_prefix, "CircuitSubsetEvaluations")]
                 pub(crate) fn _circuit_subset_evaluations(
                     circuit: &Circuit<$field>,
+                    num_subcircuits: u32,
                     layer_index: u8,
                     evaluations: *const *mut $field,
                     subset_evaluations: *const *mut $field,
                 ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "MulByScalar")]
+                pub(crate) fn _mul_by_scalar(evaluations: *mut $field, scalar: $field, n: u32) -> CudaError;
             }
         }
 
@@ -474,26 +504,36 @@ macro_rules! impl_virgo {
 
             fn circuit_evaluate(
                 circuit: &Circuit<$field>,
-                evaluations: &HostOrDeviceSlice2DMut<$field>,
+                num_circuits: usize,
+                evaluations: &HostOrDeviceSlice2D<$field>,
             ) -> IcicleResult<()> {
-                unsafe { $field_prefix_ident::_circuit_evaluate(circuit, evaluations.as_ptr()).wrap() }
+                unsafe {
+                    $field_prefix_ident::_circuit_evaluate(circuit, num_circuits as u32, evaluations.as_ptr_mut_inner())
+                        .wrap()
+                }
             }
 
             fn circuit_subset_evaluations(
                 circuit: &Circuit<$field>,
+                num_circuits: usize,
                 layer_index: u8,
-                evaluations: &HostOrDeviceSlice2DMut<$field>,
-                subset_evaluations: &HostOrDeviceSlice2DMut<$field>,
+                evaluations: &HostOrDeviceSlice2D<$field>,
+                subset_evaluations: &HostOrDeviceSlice2D<$field>,
             ) -> IcicleResult<()> {
                 unsafe {
                     $field_prefix_ident::_circuit_subset_evaluations(
                         circuit,
+                        num_circuits as u32,
                         layer_index,
-                        evaluations.as_ptr(),
-                        subset_evaluations.as_ptr(),
+                        evaluations.as_ptr_mut_inner(),
+                        subset_evaluations.as_ptr_mut_inner(),
                     )
                     .wrap()
                 }
+            }
+
+            fn mul_by_scalar(arr: &mut HostOrDeviceSlice<$field>, scalar: $field, n: u32) -> IcicleResult<()> {
+                unsafe { $field_prefix_ident::_mul_by_scalar(arr.as_mut_ptr(), scalar, n).wrap() }
             }
         }
     };

@@ -59,17 +59,27 @@ namespace virgo {
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, CircuitEvaluate)(
-    const virgo::Circuit<curve_config::scalar_t>& circuit, curve_config::scalar_t** evaluations)
+    const virgo::Circuit<curve_config::scalar_t>& circuit,
+    uint32_t num_subcircuits,
+    curve_config::scalar_t** evaluations)
   {
-    return circuit_evaluate<curve_config::scalar_t>(circuit, evaluations);
+    return circuit_evaluate<curve_config::scalar_t>(circuit, num_subcircuits, evaluations);
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, CircuitSubsetEvaluations)(
     const virgo::Circuit<curve_config::scalar_t>& circuit,
+    uint32_t num_subcircuits,
     uint8_t layer_index,
     curve_config::scalar_t** evaluations,
     curve_config::scalar_t** subset_evaluations)
   {
-    return circuit_subset_evaluations<curve_config::scalar_t>(circuit, layer_index, evaluations, subset_evaluations);
+    return circuit_subset_evaluations<curve_config::scalar_t>(
+      circuit, num_subcircuits, layer_index, evaluations, subset_evaluations);
+  }
+
+  extern "C" cudaError_t
+  CONCAT_EXPAND(CURVE, MulByScalar)(curve_config::scalar_t* arr, curve_config::scalar_t scalar, uint32_t n)
+  {
+    return mul_by_scalar(arr, scalar, n);
   }
 } // namespace virgo

@@ -9,7 +9,7 @@ use icicle_core::{
 use icicle_cuda_runtime::{
     device_context::DeviceContext,
     error::CudaError,
-    memory::{HostOrDeviceSlice, HostOrDeviceSlice2DMut},
+    memory::{HostOrDeviceSlice, HostOrDeviceSlice2D},
 };
 
 impl_virgo!("bn254", bn254, ScalarField, ScalarCfg);

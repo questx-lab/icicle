@@ -282,4 +282,23 @@ namespace virgo {
 
     return CHK_LAST();
   }
+
+  template <typename S>
+  __global__ void mul_by_scalar_kernel(S* arr, S scalar, uint32_t n)
+  {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (tid >= n) { return; }
+
+    arr[tid] = arr[tid] * scalar * (inv_r_mont<S>);
+  }
+
+  template <typename S>
+  cudaError_t mul_by_scalar(S* arr, S scalar, uint32_t n)
+  {
+    auto [num_blocks, num_threads] = find_thread_block(n);
+    mul_by_scalar_kernel<<<num_blocks, num_threads>>>(arr, scalar, n);
+
+    return CHK_LAST();
+  }
 } // namespace virgo

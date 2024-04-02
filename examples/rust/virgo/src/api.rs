@@ -255,7 +255,7 @@ mod test {
             .map(|x| IcicleFrBN254::from(x.0 .0))
             .collect();
         tree_slice
-            .copy_from_host_partially(&a)
+            .copy_from_host_partially(&a, 0)
             .unwrap();
 
         let params = K_BN254.to_vec();
@@ -270,7 +270,7 @@ mod test {
     fn get_device_value_at_index(tree_slice: &HostOrDeviceSlice<IcicleFrBN254>, index: usize) -> ArkFrBN254 {
         let mut ice_values = vec![IcicleFrBN254::zero(); 1];
         tree_slice
-            .copy_to_host_at_index(&mut ice_values, 0, index)
+            .copy_to_host_partially(&mut ice_values, index)
             .unwrap();
 
         Fp(BigInt(ice_values[0].limbs), std::marker::PhantomData)
