@@ -595,8 +595,6 @@ impl<T> Drop for HostOrDeviceSlice<T> {
                 Some((s, _)) => {
                     check_device(*device_id);
 
-                    println!("cuda free");
-
                     unsafe {
                         cudaFree(*s as *mut c_void)
                             .wrap()
