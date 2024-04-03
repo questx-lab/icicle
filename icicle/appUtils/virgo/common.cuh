@@ -16,6 +16,7 @@ namespace virgo {
 
   __device__ void panic()
   {
+    printf("cuda panic\n");
     int* a = 0;
     *a = 0;
   }

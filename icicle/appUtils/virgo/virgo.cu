@@ -2,6 +2,7 @@
 #include "sumcheck.cu"
 #include "merkle_tree.cu"
 #include "circuit.cu"
+#include "gkr.cu"
 
 namespace virgo {
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase1)(
@@ -81,5 +82,37 @@ namespace virgo {
   CONCAT_EXPAND(CURVE, MulByScalar)(curve_config::scalar_t* arr, curve_config::scalar_t scalar, uint32_t n)
   {
     return mul_by_scalar(arr, scalar, n);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, PrecomputeBookeeping)(
+    curve_config::scalar_t init, curve_config::scalar_t* g, uint8_t g_size, curve_config::scalar_t* output)
+  {
+    return precompute_bookeeping(init, g, g_size, output);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, InitializePhase1Plus)(
+    uint32_t num_replicas,
+    uint32_t num_layers,
+    uint32_t output_size,
+    SparseMultilinearExtension<curve_config::scalar_t>* f_extensions,
+    curve_config::scalar_t** s_evaluations,
+    curve_config::scalar_t* bookeeping_g,
+    curve_config::scalar_t* output)
+  {
+    return initialize_phase_1_plus(
+      num_replicas, num_layers, output_size, f_extensions, s_evaluations, bookeeping_g, output);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, InitializePhase2Plus)(
+    uint32_t num_replicas,
+    uint32_t num_layers,
+    uint32_t* on_host_output_size,
+    SparseMultilinearExtension<curve_config::scalar_t>* f_extensions,
+    curve_config::scalar_t* bookeeping_g,
+    curve_config::scalar_t* bookeeping_u,
+    curve_config::scalar_t** output)
+  {
+    return initialize_phase_2_plus(
+      num_replicas, num_layers, on_host_output_size, f_extensions, bookeeping_g, bookeeping_u, output);
   }
 } // namespace virgo

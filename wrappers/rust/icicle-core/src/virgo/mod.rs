@@ -170,6 +170,33 @@ pub trait Virgo<F: FieldImpl> {
     ) -> IcicleResult<()>;
 
     fn mul_by_scalar(arr: &mut HostOrDeviceSlice<F>, scalar: F, n: u32) -> IcicleResult<()>;
+
+    fn precompute_bookeeping(
+        init: F,
+        g: &HostOrDeviceSlice<F>,
+        g_size: u8,
+        output: &mut HostOrDeviceSlice<F>,
+    ) -> IcicleResult<()>;
+
+    fn initialize_phase_1_plus(
+        num_replicas: u32,
+        num_layers: u32,
+        output_size: u32,
+        f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
+        s_evaluations: &HostOrDeviceSlice2D<F>,
+        bookeeping_g: &HostOrDeviceSlice<F>,
+        output: &mut HostOrDeviceSlice<F>,
+    ) -> IcicleResult<()>;
+
+    fn initialize_phase_2_plus(
+        num_replicas: u32,
+        num_layers: u32,
+        on_host_output_size: Vec<u32>,
+        f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
+        bookeeping_g: &HostOrDeviceSlice<F>,
+        bookeeping_u: &HostOrDeviceSlice<F>,
+        output: &HostOrDeviceSlice2D<F>,
+    ) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -291,12 +318,72 @@ where
     )
 }
 
-pub fn mul_by_scalar<F>(arr: &mut HostOrDeviceSlice<F>, scalar: F, n: u32) -> IcicleResult<()>
+pub fn mul_by_scalar<F>(arr: &mut HostOrDeviceSlice<F>, scalar: F) -> IcicleResult<()>
 where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
 {
-    <<F as FieldImpl>::Config as Virgo<F>>::mul_by_scalar(arr, scalar, n)
+    <<F as FieldImpl>::Config as Virgo<F>>::mul_by_scalar(arr, scalar, arr.len() as u32)
+}
+
+pub fn precompute_bookeeping<F>(
+    init: F,
+    g: &HostOrDeviceSlice<F>,
+    output: &mut HostOrDeviceSlice<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::precompute_bookeeping(init, g, g.len() as u8, output)
+}
+
+pub fn initialize_phase_1_plus<F>(
+    num_replicas: u32,
+    num_layers: u32,
+    output_size: u32,
+    f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
+    s_evaluations: &HostOrDeviceSlice2D<F>,
+    bookeeping_g: &HostOrDeviceSlice<F>,
+    output: &mut HostOrDeviceSlice<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::initialize_phase_1_plus(
+        num_replicas,
+        num_layers,
+        output_size,
+        f_extensions,
+        s_evaluations,
+        bookeeping_g,
+        output,
+    )
+}
+
+pub fn initialize_phase_2_plus<F>(
+    num_replicas: u32,
+    num_layers: u32,
+    on_host_output_size: Vec<u32>,
+    f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
+    bookeeping_g: &HostOrDeviceSlice<F>,
+    bookeeping_u: &HostOrDeviceSlice<F>,
+    output: &HostOrDeviceSlice2D<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::initialize_phase_2_plus(
+        num_replicas,
+        num_layers,
+        on_host_output_size,
+        f_extensions,
+        bookeeping_g,
+        bookeeping_u,
+        output,
+    )
 }
 
 #[macro_export]
@@ -309,7 +396,8 @@ macro_rules! impl_virgo {
       ) => {
         mod $field_prefix_ident {
             use crate::virgo::{
-                $field, $field_config, Circuit, CudaError, DeviceContext, MerkleTreeConfig, SumcheckConfig,
+                $field, $field_config, Circuit, CudaError, DeviceContext, MerkleTreeConfig, SparseMultilinearExtension,
+                SumcheckConfig,
             };
 
             extern "C" {
@@ -402,6 +490,42 @@ macro_rules! impl_virgo {
             extern "C" {
                 #[link_name = concat!($field_prefix, "MulByScalar")]
                 pub(crate) fn _mul_by_scalar(evaluations: *mut $field, scalar: $field, n: u32) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "PrecomputeBookeeping")]
+                pub(crate) fn _precompute_bookeeping(
+                    init: $field,
+                    g: *const $field,
+                    g_size: u8,
+                    output: *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "InitializePhase1Plus")]
+                pub(crate) fn _initialize_phase_1_plus(
+                    num_replicas: u32,
+                    num_layers: u32,
+                    output_size: u32,
+                    f_extensions: *const SparseMultilinearExtension<$field>,
+                    s_evaluations: *const *const $field,
+                    bookeeping_g: *const $field,
+                    output: *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "InitializePhase2Plus")]
+                pub(crate) fn _initialize_phase_2_plus(
+                    num_replicas: u32,
+                    num_layers: u32,
+                    output_size: *const u32,
+                    f_extensions: *const SparseMultilinearExtension<$field>,
+                    bookeeping_g: *const $field,
+                    bookeeping_u: *const $field,
+                    output: *const *mut $field,
+                ) -> CudaError;
             }
         }
 
@@ -534,6 +658,63 @@ macro_rules! impl_virgo {
 
             fn mul_by_scalar(arr: &mut HostOrDeviceSlice<$field>, scalar: $field, n: u32) -> IcicleResult<()> {
                 unsafe { $field_prefix_ident::_mul_by_scalar(arr.as_mut_ptr(), scalar, n).wrap() }
+            }
+
+            fn precompute_bookeeping(
+                init: $field,
+                g: &HostOrDeviceSlice<$field>,
+                g_size: u8,
+                output: &mut HostOrDeviceSlice<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_precompute_bookeeping(init, g.as_ptr(), g_size, output.as_mut_ptr()).wrap()
+                }
+            }
+
+            fn initialize_phase_1_plus(
+                num_replicas: u32,
+                num_layers: u32,
+                output_size: u32,
+                f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
+                s_evaluations: &HostOrDeviceSlice2D<$field>,
+                bookeeping_g: &HostOrDeviceSlice<$field>,
+                output: &mut HostOrDeviceSlice<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_initialize_phase_1_plus(
+                        num_replicas,
+                        num_layers,
+                        output_size,
+                        f_extensions.as_ptr(),
+                        s_evaluations.as_ptr_const_inner(),
+                        bookeeping_g.as_ptr(),
+                        output.as_mut_ptr(),
+                    )
+                    .wrap()
+                }
+            }
+
+            fn initialize_phase_2_plus(
+                num_replicas: u32,
+                num_layers: u32,
+                on_host_output_size: Vec<u32>,
+                f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
+                bookeeping_g: &HostOrDeviceSlice<$field>,
+                bookeeping_u: &HostOrDeviceSlice<$field>,
+                output: &HostOrDeviceSlice2D<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_initialize_phase_2_plus(
+                        num_replicas,
+                        num_layers,
+                        on_host_output_size.as_ptr(),
+                        f_extensions.as_ptr(),
+                        bookeeping_g.as_ptr(),
+                        bookeeping_u.as_ptr(),
+                        output.as_ptr_mut_inner(),
+                    )
+                    .wrap()
+                }
             }
         }
     };

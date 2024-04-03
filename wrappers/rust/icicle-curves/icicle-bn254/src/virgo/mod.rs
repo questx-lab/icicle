@@ -4,7 +4,7 @@ use icicle_core::{
     error::IcicleResult,
     impl_virgo,
     traits::IcicleResultWrap,
-    virgo::{Circuit, MerkleTreeConfig, SumcheckConfig, Virgo},
+    virgo::{Circuit, MerkleTreeConfig, SparseMultilinearExtension, SumcheckConfig, Virgo},
 };
 use icicle_cuda_runtime::{
     device_context::DeviceContext,

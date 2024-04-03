@@ -46,6 +46,10 @@ impl<W: ToCuda> HostOrDeviceSliceWrapper<W> {
         self.ptr
             .as_ptr()
     }
+
+    pub fn as_device(&self) -> &HostOrDeviceSlice<W::CudaRepr> {
+        &self.ptr
+    }
 }
 
 impl<'a, W: ToCuda> Index<usize> for HostOrDeviceSliceWrapper<W> {
@@ -95,6 +99,13 @@ impl<T> HostOrDeviceSlice2D<T> {
         let mut_ptr = HostOrDeviceSlice::on_device(&mut_origin_ptr)?;
 
         Ok(Self { origin, ptr: mut_ptr })
+    }
+
+    pub fn ref_from(device: HostOrDeviceSlice<*mut T>) -> Self {
+        Self {
+            origin: vec![],
+            ptr: device,
+        }
     }
 
     pub fn as_ptr_const_inner(&self) -> *const *const T {
