@@ -183,7 +183,7 @@ pub trait Virgo<F: FieldImpl> {
         num_layers: u32,
         output_size: u32,
         f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
-        s_evaluations: &HostOrDeviceSlice2D<F>,
+        s_evaluations: &HostOrDeviceSlice<*const F>,
         bookeeping_g: &HostOrDeviceSlice<F>,
         output: &mut HostOrDeviceSlice<F>,
     ) -> IcicleResult<()>;
@@ -343,7 +343,7 @@ pub fn initialize_phase_1_plus<F>(
     num_layers: u32,
     output_size: u32,
     f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
-    s_evaluations: &HostOrDeviceSlice2D<F>,
+    s_evaluations: &HostOrDeviceSlice<*const F>,
     bookeeping_g: &HostOrDeviceSlice<F>,
     output: &mut HostOrDeviceSlice<F>,
 ) -> IcicleResult<()>
@@ -676,7 +676,7 @@ macro_rules! impl_virgo {
                 num_layers: u32,
                 output_size: u32,
                 f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
-                s_evaluations: &HostOrDeviceSlice2D<$field>,
+                s_evaluations: &HostOrDeviceSlice<*const $field>,
                 bookeeping_g: &HostOrDeviceSlice<$field>,
                 output: &mut HostOrDeviceSlice<$field>,
             ) -> IcicleResult<()> {
@@ -686,7 +686,7 @@ macro_rules! impl_virgo {
                         num_layers,
                         output_size,
                         f_extensions.as_ptr(),
-                        s_evaluations.as_ptr_const_inner(),
+                        s_evaluations.as_ptr(),
                         bookeeping_g.as_ptr(),
                         output.as_mut_ptr(),
                     )

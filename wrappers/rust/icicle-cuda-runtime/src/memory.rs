@@ -9,6 +9,7 @@ use crate::stream::CudaStream;
 use std::mem::{size_of, MaybeUninit};
 use std::ops::{Index, IndexMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 use std::os::raw::c_void;
+use std::time::Instant;
 
 pub trait ToCuda {
     type CudaRepr;
@@ -224,6 +225,9 @@ impl<T> Index<usize> for HostOrDeviceSlice3D<T> {
 pub enum HostOrDeviceSlice<T> {
     Host(Vec<T>),
     Device(Option<(*mut T, usize)>, i32),
+
+    // DeviceRef will not be dropped when the variable is out of scope.
+    DeviceRef(Option<(*mut T, usize)>, i32),
 }
 
 impl<T> HostOrDeviceSlice<T> {
@@ -231,6 +235,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn get_device_id(&self) -> Option<i32> {
         match self {
             HostOrDeviceSlice::Device(_, device_id) => Some(*device_id),
+            HostOrDeviceSlice::DeviceRef(_, device_id) => Some(*device_id),
             HostOrDeviceSlice::Host(_) => None,
         }
     }
@@ -238,6 +243,15 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn len(&self) -> usize {
         match self {
             Self::Device(s, _) => {
+                if s.is_none() {
+                    0
+                } else {
+                    s.as_ref()
+                        .unwrap()
+                        .1
+                }
+            }
+            Self::DeviceRef(s, _) => {
                 if s.is_none() {
                     0
                 } else {
@@ -262,6 +276,16 @@ impl<T> HostOrDeviceSlice<T> {
                         == 0
                 }
             }
+            Self::DeviceRef(s, _) => {
+                if s.is_none() {
+                    true
+                } else {
+                    s.as_ref()
+                        .unwrap()
+                        .1
+                        == 0
+                }
+            }
             Self::Host(v) => v.is_empty(),
         }
     }
@@ -269,6 +293,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn is_on_device(&self) -> bool {
         match self {
             Self::Device(_, _) => true,
+            Self::DeviceRef(_, _) => true,
             Self::Host(_) => false,
         }
     }
@@ -276,6 +301,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
             Self::Device(_, _) => panic!("Use copy_to_host and copy_to_host_async to move device data to a slice"),
+            Self::DeviceRef(_, _) => panic!("Use copy_to_host and copy_to_host_async to move device data to a slice"),
             Self::Host(v) => v.as_mut_slice(),
         }
     }
@@ -283,6 +309,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
             Self::Device(_, _) => panic!("Use copy_to_host and copy_to_host_async to move device data to a slice"),
+            Self::DeviceRef(_, _) => panic!("Use copy_to_host and copy_to_host_async to move device data to a slice"),
             Self::Host(v) => v.as_slice(),
         }
     }
@@ -294,6 +321,11 @@ impl<T> HostOrDeviceSlice<T> {
 
         match self {
             Self::Device(s, _) => {
+                s.as_ref()
+                    .unwrap()
+                    .0
+            }
+            Self::DeviceRef(s, _) => {
                 s.as_ref()
                     .unwrap()
                     .0
@@ -313,7 +345,16 @@ impl<T> HostOrDeviceSlice<T> {
                     .unwrap()
                     .0
             }
+            Self::DeviceRef(_, _) => panic!("device reference should not be mutable"),
             Self::Host(v) => v.as_mut_ptr(),
+        }
+    }
+
+    pub fn device_ref(other: &Self) -> HostOrDeviceSlice<T> {
+        match &other {
+            Self::Host(_) => panic!("only support device ref"),
+            Self::Device(s, device_id) => Self::DeviceRef(*s, *device_id),
+            Self::DeviceRef(s, device_id) => Self::DeviceRef(*s, *device_id),
         }
     }
 
@@ -385,6 +426,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_from_host(&mut self, val: &[T]) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy into, and not host"),
         };
         assert!(
@@ -409,6 +451,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_from_host_partially(&mut self, val: &[T], dst_index: usize) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy into, and not host"),
         };
         assert!(
@@ -435,6 +478,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_to_host(&self, val: &mut [T]) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy from, and not host"),
         };
         assert!(
@@ -459,6 +503,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_to_host_partially(&self, val: &mut [T], device_index: usize) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy from, and not host"),
         };
 
@@ -481,6 +526,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_from_host_async(&mut self, val: &[T], stream: &CudaStream) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy into, and not host"),
         };
         assert!(
@@ -506,6 +552,7 @@ impl<T> HostOrDeviceSlice<T> {
     pub fn copy_to_host_async(&self, val: &mut [T], stream: &CudaStream) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
             Self::Host(_) => panic!("Need device memory to copy from, and not host"),
         };
         assert!(
@@ -555,6 +602,28 @@ impl<T: Clone> Clone for HostOrDeviceSlice<T> {
                     new
                 }
             },
+            HostOrDeviceSlice::DeviceRef(s, device_id) => match s {
+                None => Self::Device(None, device_id.clone()),
+                Some((pointer, size)) => {
+                    let mut new = HostOrDeviceSlice::cuda_malloc(*size).unwrap();
+
+                    let count = size_of::<T>() * self.len();
+                    unsafe {
+                        let err = cudaMemcpy(
+                            new.as_mut_ptr() as *mut c_void,
+                            *pointer as *const c_void,
+                            count,
+                            cudaMemcpyKind::cudaMemcpyDeviceToDevice,
+                        );
+
+                        if err != cudaError::cudaSuccess {
+                            panic!("failed to clone device memory {:?}", err);
+                        }
+                    }
+
+                    new
+                }
+            },
         }
     }
 }
@@ -569,6 +638,7 @@ macro_rules! impl_index {
                 fn index(&self, index: $t) -> &Self::Output {
                     match self {
                         Self::Device(_, _) => panic!("doesn't support index device memory"),
+                        Self::DeviceRef(_, _) => panic!("doesn't support index device memory"),
                         Self::Host(v) => v.index(index),
                     }
                 }
@@ -579,6 +649,7 @@ macro_rules! impl_index {
                 fn index_mut(&mut self, index: $t) -> &mut Self::Output {
                     match self {
                         Self::Device(_,_) => panic!("doesn't support index device memory"),
+                        Self::DeviceRef(_,_) => panic!("doesn't support index device memory"),
                         Self::Host(v) => v.index_mut(index),
                     }
                 }
@@ -614,6 +685,7 @@ impl<T> Drop for HostOrDeviceSlice<T> {
                 }
                 _ => {}
             },
+            Self::DeviceRef(_, _) => {}
             Self::Host(_) => {}
         }
     }
