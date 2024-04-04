@@ -266,9 +266,7 @@ where
     F: FieldImpl,
     <F as FieldImpl>::Config: Virgo<F>,
 {
-    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n)?;
-
-    Ok(())
+    <<F as FieldImpl>::Config as Virgo<F>>::build_merkle_tree(config, tree, n)
 }
 
 pub fn hash_merkle_tree_slice<F>(
