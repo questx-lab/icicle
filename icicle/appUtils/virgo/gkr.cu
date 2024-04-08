@@ -84,7 +84,6 @@ namespace virgo {
 
   template <typename S>
   cudaError_t initialize_phase_1_plus(
-    uint32_t num_replicas,
     uint32_t num_layers,
     uint32_t output_size,
     SparseMultilinearExtension<S>* f_extensions,
@@ -103,17 +102,20 @@ namespace virgo {
 
   template <typename S>
   __global__ void update_bookeeping_phase_2(
-    uint8_t relative_layer_index,
+    uint32_t max_output_size,
+    uint32_t* on_device_output_size,
     SparseMultilinearExtension<S>* f_extensions,
     S* bookeeping_g,
     S* bookeeping_u,
     S** output)
   {
     uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+    uint32_t relative_layer_index = tid / max_output_size;
+    uint32_t y_index = tid % max_output_size;
+    if (y_index >= on_device_output_size[relative_layer_index]) { return; }
 
     SparseMultilinearExtension<S> target_ext = f_extensions[relative_layer_index];
 
-    uint32_t y_index = tid;
     uint32_t replica_index = y_index / (1 << target_ext.y_num_vars);
     uint32_t relative_y_index = y_index % (1 << target_ext.y_num_vars);
 
@@ -138,7 +140,6 @@ namespace virgo {
 
   template <typename S>
   cudaError_t initialize_phase_2_plus(
-    uint32_t num_replicas,
     uint32_t num_layers,
     uint32_t* on_host_output_size,
     SparseMultilinearExtension<S>* f_extensions,
@@ -148,11 +149,64 @@ namespace virgo {
   {
     CHK_INIT_IF_RETURN();
 
-    for (uint8_t relative_layer_index = 0; relative_layer_index < num_layers; relative_layer_index++) {
-      auto [num_blocks, num_threads] = find_thread_block(on_host_output_size[relative_layer_index]);
+    uint32_t max_output_size = 0;
 
-      update_bookeeping_phase_2<<<num_blocks, num_threads>>>(
-        relative_layer_index, f_extensions, bookeeping_g, bookeeping_u, output);
+    uint32_t* on_device_output_size;
+    CHK_IF_RETURN(cudaMalloc((void**)&on_device_output_size, num_layers * sizeof(uint32_t)));
+    CHK_IF_RETURN(
+      cudaMemcpy(on_device_output_size, on_host_output_size, num_layers * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+    for (uint8_t relative_layer_index = 0; relative_layer_index < num_layers; relative_layer_index++) {
+      if (on_host_output_size[relative_layer_index] > max_output_size) {
+        max_output_size = on_host_output_size[relative_layer_index];
+      }
+    }
+
+    auto [num_blocks, num_threads] = find_thread_block(num_layers * max_output_size);
+    update_bookeeping_phase_2<<<num_blocks, num_threads>>>(
+      max_output_size, on_device_output_size, f_extensions, bookeeping_g, bookeeping_u, output);
+
+    CHK_IF_RETURN(cudaFree(on_device_output_size));
+
+    return CHK_LAST();
+  }
+
+  template <typename S>
+  __global__ void update_combinging_point(
+    uint8_t relative_layer_index, ReverseSparseMultilinearExtension* reverse_exts, S** bookeeping_rs, S* output)
+  {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    ReverseSparseMultilinearExtension target_ext = reverse_exts[relative_layer_index];
+
+    uint32_t subset_index = tid;
+    uint32_t replica_index = subset_index / (1 << target_ext.subset_num_vars);
+    uint32_t relative_subset_index = subset_index % (1 << target_ext.subset_num_vars);
+
+    uint32_t position = target_ext.subset_position[relative_subset_index];
+
+    if (position == 4294967295) { return; }
+
+    uint32_t relative_real_index = target_ext.point_real[position];
+    uint32_t real_index = relative_real_index + (replica_index << target_ext.real_num_vars);
+
+    output[real_index] = output[real_index] + bookeeping_rs[relative_layer_index][subset_index];
+  }
+
+  template <typename S>
+  cudaError_t initialize_combining_point(
+    uint32_t num_layers,
+    uint32_t* on_host_bookeeping_rs_size,
+    S** bookeeping_rs,
+    ReverseSparseMultilinearExtension* reverse_exts,
+    S* output)
+  {
+    CHK_INIT_IF_RETURN();
+
+    for (uint8_t relative_layer_index = 0; relative_layer_index < num_layers; relative_layer_index++) {
+      auto [num_blocks, num_threads] = find_thread_block(on_host_bookeeping_rs_size[relative_layer_index]);
+
+      update_combinging_point<<<num_blocks, num_threads>>>(relative_layer_index, reverse_exts, bookeeping_rs, output);
     }
 
     return CHK_LAST();

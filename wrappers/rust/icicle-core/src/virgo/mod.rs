@@ -179,23 +179,29 @@ pub trait Virgo<F: FieldImpl> {
     ) -> IcicleResult<()>;
 
     fn initialize_phase_1_plus(
-        num_replicas: u32,
         num_layers: u32,
         output_size: u32,
         f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
-        s_evaluations: &HostOrDeviceSlice<*const F>,
+        s_evaluations: &HostOrDeviceSlice2D<F>,
         bookeeping_g: &HostOrDeviceSlice<F>,
         output: &mut HostOrDeviceSlice<F>,
     ) -> IcicleResult<()>;
 
     fn initialize_phase_2_plus(
-        num_replicas: u32,
         num_layers: u32,
         on_host_output_size: Vec<u32>,
         f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
         bookeeping_g: &HostOrDeviceSlice<F>,
         bookeeping_u: &HostOrDeviceSlice<F>,
         output: &HostOrDeviceSlice2D<F>,
+    ) -> IcicleResult<()>;
+
+    fn initialize_combining_point(
+        num_layers: u32,
+        on_host_bookeeping_rs_size: Vec<u32>,
+        bookeeping_rs: &HostOrDeviceSlice2D<F>,
+        reverse_exts: &HostOrDeviceSlice<ReverseSparseMultilinearExtension>,
+        output: &mut HostOrDeviceSlice<F>,
     ) -> IcicleResult<()>;
 }
 
@@ -337,11 +343,10 @@ where
 }
 
 pub fn initialize_phase_1_plus<F>(
-    num_replicas: u32,
     num_layers: u32,
     output_size: u32,
     f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
-    s_evaluations: &HostOrDeviceSlice<*const F>,
+    s_evaluations: &HostOrDeviceSlice2D<F>,
     bookeeping_g: &HostOrDeviceSlice<F>,
     output: &mut HostOrDeviceSlice<F>,
 ) -> IcicleResult<()>
@@ -350,7 +355,6 @@ where
     <F as FieldImpl>::Config: Virgo<F>,
 {
     <<F as FieldImpl>::Config as Virgo<F>>::initialize_phase_1_plus(
-        num_replicas,
         num_layers,
         output_size,
         f_extensions,
@@ -361,7 +365,6 @@ where
 }
 
 pub fn initialize_phase_2_plus<F>(
-    num_replicas: u32,
     num_layers: u32,
     on_host_output_size: Vec<u32>,
     f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
@@ -374,12 +377,31 @@ where
     <F as FieldImpl>::Config: Virgo<F>,
 {
     <<F as FieldImpl>::Config as Virgo<F>>::initialize_phase_2_plus(
-        num_replicas,
         num_layers,
         on_host_output_size,
         f_extensions,
         bookeeping_g,
         bookeeping_u,
+        output,
+    )
+}
+
+pub fn initialize_combining_point<F>(
+    num_layers: u32,
+    on_host_bookeeping_rs_size: Vec<u32>,
+    bookeeping_rs: &HostOrDeviceSlice2D<F>,
+    reverse_exts: &HostOrDeviceSlice<ReverseSparseMultilinearExtension>,
+    output: &mut HostOrDeviceSlice<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::initialize_combining_point(
+        num_layers,
+        on_host_bookeeping_rs_size,
+        bookeeping_rs,
+        reverse_exts,
         output,
     )
 }
@@ -394,8 +416,8 @@ macro_rules! impl_virgo {
       ) => {
         mod $field_prefix_ident {
             use crate::virgo::{
-                $field, $field_config, Circuit, CudaError, DeviceContext, MerkleTreeConfig, SparseMultilinearExtension,
-                SumcheckConfig,
+                $field, $field_config, Circuit, CudaError, DeviceContext, MerkleTreeConfig,
+                ReverseSparseMultilinearExtension, SparseMultilinearExtension, SumcheckConfig,
             };
 
             extern "C" {
@@ -503,7 +525,6 @@ macro_rules! impl_virgo {
             extern "C" {
                 #[link_name = concat!($field_prefix, "InitializePhase1Plus")]
                 pub(crate) fn _initialize_phase_1_plus(
-                    num_replicas: u32,
                     num_layers: u32,
                     output_size: u32,
                     f_extensions: *const SparseMultilinearExtension<$field>,
@@ -516,13 +537,23 @@ macro_rules! impl_virgo {
             extern "C" {
                 #[link_name = concat!($field_prefix, "InitializePhase2Plus")]
                 pub(crate) fn _initialize_phase_2_plus(
-                    num_replicas: u32,
                     num_layers: u32,
                     output_size: *const u32,
                     f_extensions: *const SparseMultilinearExtension<$field>,
                     bookeeping_g: *const $field,
                     bookeeping_u: *const $field,
                     output: *const *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "InitializeCombiningPoint")]
+                pub(crate) fn _initialize_combining_point(
+                    num_layers: u32,
+                    on_host_bookeeping_rs_size: *const u32,
+                    bookeeping_rs: *const *const $field,
+                    reverse_exts: *const ReverseSparseMultilinearExtension,
+                    output: *mut $field,
                 ) -> CudaError;
             }
         }
@@ -670,21 +701,19 @@ macro_rules! impl_virgo {
             }
 
             fn initialize_phase_1_plus(
-                num_replicas: u32,
                 num_layers: u32,
                 output_size: u32,
                 f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
-                s_evaluations: &HostOrDeviceSlice<*const $field>,
+                s_evaluations: &HostOrDeviceSlice2D<$field>,
                 bookeeping_g: &HostOrDeviceSlice<$field>,
                 output: &mut HostOrDeviceSlice<$field>,
             ) -> IcicleResult<()> {
                 unsafe {
                     $field_prefix_ident::_initialize_phase_1_plus(
-                        num_replicas,
                         num_layers,
                         output_size,
                         f_extensions.as_ptr(),
-                        s_evaluations.as_ptr(),
+                        s_evaluations.as_ptr_const_inner(),
                         bookeeping_g.as_ptr(),
                         output.as_mut_ptr(),
                     )
@@ -693,7 +722,6 @@ macro_rules! impl_virgo {
             }
 
             fn initialize_phase_2_plus(
-                num_replicas: u32,
                 num_layers: u32,
                 on_host_output_size: Vec<u32>,
                 f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
@@ -703,13 +731,31 @@ macro_rules! impl_virgo {
             ) -> IcicleResult<()> {
                 unsafe {
                     $field_prefix_ident::_initialize_phase_2_plus(
-                        num_replicas,
                         num_layers,
                         on_host_output_size.as_ptr(),
                         f_extensions.as_ptr(),
                         bookeeping_g.as_ptr(),
                         bookeeping_u.as_ptr(),
                         output.as_ptr_mut_inner(),
+                    )
+                    .wrap()
+                }
+            }
+
+            fn initialize_combining_point(
+                num_layers: u32,
+                on_host_bookeeping_rs_size: Vec<u32>,
+                bookeeping_rs: &HostOrDeviceSlice2D<$field>,
+                reverse_exts: &HostOrDeviceSlice<ReverseSparseMultilinearExtension>,
+                output: &mut HostOrDeviceSlice<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_initialize_combining_point(
+                        num_layers,
+                        on_host_bookeeping_rs_size.as_ptr(),
+                        bookeeping_rs.as_ptr_const_inner(),
+                        reverse_exts.as_ptr(),
+                        output.as_mut_ptr(),
                     )
                     .wrap()
                 }

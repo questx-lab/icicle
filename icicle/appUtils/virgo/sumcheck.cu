@@ -90,7 +90,7 @@ namespace virgo {
 
     // 2. Sum up all the values in the array.
     sum_single_array(device_tmp, n, stream);
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyHostToHost, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
 
     CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
 
@@ -112,7 +112,7 @@ namespace virgo {
     // Sum up all the values in the array.
     sum_single_array(device_tmp, n, stream);
     // copy the result to output
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyHostToHost, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
 
     // free the temp array.
     CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
@@ -158,7 +158,6 @@ namespace virgo {
     auto stream = config.ctx.stream;
 
     CHK_INIT_IF_RETURN();
-    auto start = std::chrono::high_resolution_clock::now();
 
     auto half_n = n / 2;
     auto sum_len = 3 * half_n;
@@ -176,14 +175,11 @@ namespace virgo {
     // Step 2. Sum up.
     sum_arrays(device_tmp, 3, half_n, stream);
 
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyHostToHost, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyHostToHost, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyHostToHost, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
 
     CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
-
-    auto end1 = std::chrono::high_resolution_clock::now();
-    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
 
     return CHK_LAST();
   }
@@ -222,7 +218,6 @@ namespace virgo {
     auto stream = config.ctx.stream;
 
     CHK_INIT_IF_RETURN();
-    auto start = std::chrono::high_resolution_clock::now();
 
     auto half_n = n / 2;
     auto sum_len = 3 * half_n;
@@ -241,14 +236,11 @@ namespace virgo {
     // sum_single_array(device_tmp, n / 2);
     sum_arrays(device_tmp, 3, half_n, stream);
 
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyHostToHost, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyHostToHost, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyHostToHost, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
 
     CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
-
-    auto end1 = std::chrono::high_resolution_clock::now();
-    auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start);
 
     return CHK_LAST();
   }

@@ -91,7 +91,6 @@ namespace virgo {
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, InitializePhase1Plus)(
-    uint32_t num_replicas,
     uint32_t num_layers,
     uint32_t output_size,
     SparseMultilinearExtension<curve_config::scalar_t>* f_extensions,
@@ -99,12 +98,10 @@ namespace virgo {
     curve_config::scalar_t* bookeeping_g,
     curve_config::scalar_t* output)
   {
-    return initialize_phase_1_plus(
-      num_replicas, num_layers, output_size, f_extensions, s_evaluations, bookeeping_g, output);
+    return initialize_phase_1_plus(num_layers, output_size, f_extensions, s_evaluations, bookeeping_g, output);
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, InitializePhase2Plus)(
-    uint32_t num_replicas,
     uint32_t num_layers,
     uint32_t* on_host_output_size,
     SparseMultilinearExtension<curve_config::scalar_t>* f_extensions,
@@ -112,7 +109,16 @@ namespace virgo {
     curve_config::scalar_t* bookeeping_u,
     curve_config::scalar_t** output)
   {
-    return initialize_phase_2_plus(
-      num_replicas, num_layers, on_host_output_size, f_extensions, bookeeping_g, bookeeping_u, output);
+    return initialize_phase_2_plus(num_layers, on_host_output_size, f_extensions, bookeeping_g, bookeeping_u, output);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, InitializeCombiningPoint)(
+    uint32_t num_layers,
+    uint32_t* on_host_bookeeping_rs,
+    curve_config::scalar_t** bookeeping_rs,
+    ReverseSparseMultilinearExtension* reverse_exts,
+    curve_config::scalar_t* output)
+  {
+    return initialize_combining_point(num_layers, on_host_bookeeping_rs, bookeeping_rs, reverse_exts, output);
   }
 } // namespace virgo
