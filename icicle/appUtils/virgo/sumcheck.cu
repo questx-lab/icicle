@@ -43,28 +43,28 @@ namespace virgo {
   }
 
   template <typename S>
-  cudaError_t sum_arrays(S* arrs, uint32_t m, uint32_t n, CUstream_st* stream)
+  cudaError_t sum_arrays(S* arrs, uint32_t m, uint32_t n)
   {
     auto x = n;
     while (x > 1) {
       auto [num_blocks, num_threads] = find_thread_block((x * m) >> 1);
 
       int half = (x + 1) >> 1;
-      reduce_sum_kernel2<<<num_blocks, num_threads, 0, stream>>>(arrs, m, x, half, n);
+      reduce_sum_kernel2<<<num_blocks, num_threads>>>(arrs, m, x, half, n);
 
       x = (x + 1) >> 1;
     }
   }
 
   template <typename S>
-  cudaError_t sum_single_array(S* arr, int n, CUstream_st* stream)
+  cudaError_t sum_single_array(S* arr, int n)
   {
     auto x = n;
     while (x > 1) {
       auto [num_blocks, num_threads] = find_thread_block(x >> 1);
 
       int half = (x + 1) >> 1;
-      reduce_sum_kernel<<<num_blocks, num_threads, 0, stream>>>(arr, x, half);
+      reduce_sum_kernel<<<num_blocks, num_threads>>>(arr, x, half);
 
       x = (x + 1) >> 1;
     }
@@ -77,22 +77,20 @@ namespace virgo {
   template <typename S>
   cudaError_t bk_sum_all_case_1(const SumcheckConfig& config, S* table1, S* table2, S* output, int n)
   {
-    auto stream = config.ctx.stream;
-
     CHK_INIT_IF_RETURN();
 
     S* device_tmp;
     // allocate device array
-    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n * sizeof(S), stream));
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, n * sizeof(S)));
 
     auto [num_blocks, num_threads] = find_thread_block(n);
-    mul_pair_kernel<<<num_blocks, num_threads, 0, stream>>>(table1, table2, device_tmp, n);
+    mul_pair_kernel<<<num_blocks, num_threads>>>(table1, table2, device_tmp, n);
 
     // 2. Sum up all the values in the array.
-    sum_single_array(device_tmp, n, stream);
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    sum_single_array(device_tmp, n);
+    CHK_IF_RETURN(cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice));
 
-    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+    CHK_IF_RETURN(cudaFree(device_tmp));
 
     return CHK_LAST();
   }
@@ -100,22 +98,20 @@ namespace virgo {
   template <typename S>
   cudaError_t bk_sum_all_case_2(const SumcheckConfig& config, S* arr, S* output, int n)
   {
-    auto stream = config.ctx.stream;
-
     CHK_INIT_IF_RETURN();
 
     S* device_tmp;
     // allocate device array
-    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n * sizeof(S), stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(device_tmp, arr, n * sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, n * sizeof(S)));
+    CHK_IF_RETURN(cudaMemcpy(device_tmp, arr, n * sizeof(S), cudaMemcpyDeviceToDevice));
 
     // Sum up all the values in the array.
-    sum_single_array(device_tmp, n, stream);
+    sum_single_array(device_tmp, n);
     // copy the result to output
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice));
 
     // free the temp array.
-    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+    CHK_IF_RETURN(cudaFree(device_tmp));
 
     return CHK_LAST();
   }
@@ -155,8 +151,6 @@ namespace virgo {
   template <typename S>
   cudaError_t bk_produce_case_1(const SumcheckConfig& config, S* table1, S* table2, S* output, int n)
   {
-    auto stream = config.ctx.stream;
-
     CHK_INIT_IF_RETURN();
 
     auto half_n = n / 2;
@@ -164,22 +158,22 @@ namespace virgo {
 
     S* device_tmp;
     // allocate device array
-    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, sum_len * sizeof(S), stream));
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, sum_len * sizeof(S)));
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    bk_produce_case_1_multiply<<<num_blocks, num_threads, 0, stream>>>(table1, table2, device_tmp, n);
+    bk_produce_case_1_multiply<<<num_blocks, num_threads>>>(table1, table2, device_tmp, n);
 
     auto err2 = CHK_LAST();
 
     // Step 2. Sum up.
-    sum_arrays(device_tmp, 3, half_n, stream);
+    sum_arrays(device_tmp, 3, half_n);
 
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice));
+    CHK_IF_RETURN(cudaMemcpy(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice));
+    CHK_IF_RETURN(cudaMemcpy(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice));
 
-    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+    CHK_IF_RETURN(cudaFree(device_tmp));
 
     return CHK_LAST();
   }
@@ -215,8 +209,6 @@ namespace virgo {
   template <typename S>
   cudaError_t bk_produce_case_2(const SumcheckConfig& config, S* table, S* output, int n)
   {
-    auto stream = config.ctx.stream;
-
     CHK_INIT_IF_RETURN();
 
     auto half_n = n / 2;
@@ -224,23 +216,23 @@ namespace virgo {
 
     S* device_tmp;
     // allocate device array
-    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, sum_len * sizeof(S), stream));
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, sum_len * sizeof(S)));
 
     // Step 1. Multiply
     auto [num_blocks, num_threads] = find_thread_block(sum_len);
-    bk_produce_case_2_multiply<<<num_blocks, num_threads, 0, stream>>>(table, device_tmp, n);
+    bk_produce_case_2_multiply<<<num_blocks, num_threads>>>(table, device_tmp, n);
 
     auto err2 = CHK_LAST();
 
     // Step 2. Sum up.
     // sum_single_array(device_tmp, n / 2);
-    sum_arrays(device_tmp, 3, half_n, stream);
+    sum_arrays(device_tmp, 3, half_n);
 
-    CHK_IF_RETURN(cudaMemcpyAsync(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
-    CHK_IF_RETURN(cudaMemcpyAsync(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpy(output, device_tmp, sizeof(S), cudaMemcpyDeviceToDevice));
+    CHK_IF_RETURN(cudaMemcpy(output + 1, device_tmp + half_n, sizeof(S), cudaMemcpyDeviceToDevice));
+    CHK_IF_RETURN(cudaMemcpy(output + 2, device_tmp + n, sizeof(S), cudaMemcpyDeviceToDevice));
 
-    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+    CHK_IF_RETURN(cudaFree(device_tmp));
 
     return CHK_LAST();
   }
@@ -257,20 +249,18 @@ namespace virgo {
   template <typename S>
   cudaError_t bk_reduce(const SumcheckConfig& config, S* arr, int n, S r)
   {
-    auto stream = config.ctx.stream;
-
     // allocate device array
     S* device_tmp;
-    CHK_IF_RETURN(cudaMallocAsync((void**)&device_tmp, n / 2 * sizeof(S), stream));
+    CHK_IF_RETURN(cudaMalloc((void**)&device_tmp, n / 2 * sizeof(S)));
 
     auto [num_blocks, num_threads] = find_thread_block(n / 2);
-    run_bk_reduce<<<num_blocks, num_threads, 0, stream>>>(arr, device_tmp, n / 2, r);
+    run_bk_reduce<<<num_blocks, num_threads>>>(arr, device_tmp, n / 2, r);
 
     // copy the output back to the original array.
-    CHK_IF_RETURN(cudaMemcpyAsync(arr, device_tmp, n / 2 * sizeof(S), cudaMemcpyDeviceToDevice, stream));
+    CHK_IF_RETURN(cudaMemcpy(arr, device_tmp, n / 2 * sizeof(S), cudaMemcpyDeviceToDevice));
 
     // free the tmp array.
-    CHK_IF_RETURN(cudaFreeAsync(device_tmp, stream));
+    CHK_IF_RETURN(cudaFree(device_tmp));
 
     return CHK_LAST();
   }

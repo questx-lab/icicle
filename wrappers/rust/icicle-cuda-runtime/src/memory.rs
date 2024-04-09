@@ -368,7 +368,7 @@ impl<T> HostOrDeviceSlice<T> {
     }
 
     pub fn on_device<'b>(v: &'b [T]) -> CudaResult<Self> {
-        let mut device = HostOrDeviceSlice::cuda_malloc(v.len()).unwrap();
+        let mut device = HostOrDeviceSlice::cuda_malloc(v.len())?;
         if v.len() > 0 {
             device.copy_from_host(v)?;
         }
@@ -479,6 +479,70 @@ impl<T> HostOrDeviceSlice<T> {
                     cudaMemcpyKind::cudaMemcpyHostToDevice,
                 )
                 .wrap()?
+            }
+        }
+        Ok(())
+    }
+
+    pub fn device_copy_partially(&mut self, src: &Self, dst_index: usize) -> CudaResult<()> {
+        match self {
+            Self::Device(_, device_id) => check_device(*device_id),
+            Self::DeviceRef(_, device_id) => check_device(*device_id),
+            Self::Host(_) => panic!("Need device memory to copy into, and not host"),
+        };
+
+        assert!(
+            self.len() - dst_index >= src.len(),
+            "Destination has a larger size than source"
+        );
+
+        let size = size_of::<T>() * src.len();
+        if size != 0 {
+            match &src {
+                Self::Host(h) => unsafe {
+                    cudaMemcpy(
+                        self.as_mut_ptr()
+                            .wrapping_add(dst_index) as *mut c_void,
+                        h.as_ptr() as *const c_void,
+                        size,
+                        cudaMemcpyKind::cudaMemcpyHostToDevice,
+                    )
+                    .wrap()?
+                },
+                Self::Device(option_s, device_id) => {
+                    check_device(*device_id);
+
+                    match option_s {
+                        None => panic!("invalid source address"),
+                        Some((s, _)) => unsafe {
+                            cudaMemcpy(
+                                self.as_mut_ptr()
+                                    .wrapping_add(dst_index) as *mut c_void,
+                                *s as *const c_void,
+                                size,
+                                cudaMemcpyKind::cudaMemcpyDeviceToDevice,
+                            )
+                            .wrap()?
+                        },
+                    }
+                }
+                Self::DeviceRef(option_s, device_id) => {
+                    check_device(*device_id);
+
+                    match option_s {
+                        None => panic!("invalid source address"),
+                        Some((s, _)) => unsafe {
+                            cudaMemcpy(
+                                self.as_mut_ptr()
+                                    .wrapping_add(dst_index) as *mut c_void,
+                                *s as *const c_void,
+                                size,
+                                cudaMemcpyKind::cudaMemcpyDeviceToDevice,
+                            )
+                            .wrap()?
+                        },
+                    }
+                }
             }
         }
         Ok(())
@@ -626,7 +690,7 @@ impl<T: Clone> Clone for HostOrDeviceSlice<T> {
                         );
 
                         if err != cudaError::cudaSuccess {
-                            panic!("failed to clone device memory {:?}", err);
+                            panic!("failed to clone device memory src={:?} err={:?}", pointer, err);
                         }
                     }
 
@@ -691,6 +755,8 @@ impl<T> Drop for HostOrDeviceSlice<T> {
                             .wrap()
                             .unwrap();
                     }
+
+                    *s = ::std::ptr::null_mut();
                 }
                 _ => {}
             },
