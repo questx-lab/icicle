@@ -3,6 +3,8 @@
 #include "merkle_tree.cu"
 #include "circuit.cu"
 #include "gkr.cu"
+#include "fri.cu"
+#include "vpd.cu"
 
 namespace virgo {
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, BkSumAllCase1)(
@@ -47,6 +49,15 @@ namespace virgo {
     const MerkleTreeConfig<curve_config::scalar_t>& config, curve_config::scalar_t* tree, int n)
   {
     return build_merkle_tree<curve_config::scalar_t>(config, tree, n);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, ExchangeEvaluations)(
+    uint32_t num_evaluations,
+    uint32_t evaluation_size,
+    curve_config::scalar_t** evaluations,
+    curve_config::scalar_t* output)
+  {
+    return exchange_evaluations(num_evaluations, evaluation_size, evaluations, output);
   }
 
   extern "C" cudaError_t CONCAT_EXPAND(CURVE, HashMerkleTreeSlice)(
@@ -121,4 +132,45 @@ namespace virgo {
   {
     return initialize_combining_point(num_layers, on_host_bookeeping_rs, bookeeping_rs, reverse_exts, output);
   }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, FoldMulti)(
+    curve_config::scalar_t* domain,
+    uint32_t domain_size,
+    uint32_t num_replicas,
+    curve_config::scalar_t random_point,
+    curve_config::scalar_t** evaluations,
+    uint32_t evaluation_size,
+    curve_config::scalar_t** output)
+  {
+    return fold_multi(domain, domain_size, num_replicas, random_point, evaluations, evaluation_size, output);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, DenseMleMulti)(
+    uint32_t num_mle,
+    curve_config::scalar_t* output,
+    curve_config::scalar_t** evaluations,
+    uint32_t evaluation_size,
+    curve_config::scalar_t* on_host_input)
+  {
+    return dense_mle_multi(num_mle, output, evaluations, evaluation_size, on_host_input);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, MulArrMulti)(
+    uint32_t num_arr, uint32_t size, curve_config::scalar_t** a, curve_config::scalar_t** b)
+  {
+    return mul_arr_multi(num_arr, size, a, b);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, SubArrMulti)(
+    uint32_t num_arr, uint32_t size, curve_config::scalar_t** a, curve_config::scalar_t** b)
+  {
+    return sub_arr_multi(num_arr, size, a, b);
+  }
+
+  extern "C" cudaError_t CONCAT_EXPAND(CURVE, MulByScalarMulti)(
+    uint32_t num_arr, uint32_t size, curve_config::scalar_t** a, curve_config::scalar_t scalar)
+  {
+    return mul_by_scalar_multi(num_arr, size, a, scalar);
+  }
+
 } // namespace virgo

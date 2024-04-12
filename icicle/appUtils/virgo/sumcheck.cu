@@ -272,7 +272,7 @@ namespace virgo {
 
     if (tid >= n) { return; }
 
-    arr[tid] = arr[tid] * scalar * (inv_r_mont<S>);
+    arr[tid] = arr[tid] * scalar * inv_r_mont<S>;
   }
 
   template <typename S>

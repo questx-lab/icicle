@@ -6,6 +6,6 @@ use icicle_core::impl_fft;
 use icicle_core::traits::IcicleResultWrap;
 use icicle_cuda_runtime::device_context::DeviceContext;
 use icicle_cuda_runtime::error::CudaError;
-use icicle_cuda_runtime::memory::HostOrDeviceSlice;
+use icicle_cuda_runtime::memory::{HostOrDeviceSlice, HostOrDeviceSlice2D};
 
 impl_fft!("bn254", bn254, ScalarField, ScalarCfg);

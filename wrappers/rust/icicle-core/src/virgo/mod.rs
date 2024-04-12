@@ -156,17 +156,23 @@ pub trait Virgo<F: FieldImpl> {
         slice_size: u32,
     ) -> IcicleResult<()>;
 
+    fn exchange_evaluations(
+        evaluations: &HostOrDeviceSlice2D<F>,
+        output: &mut HostOrDeviceSlice<F>,
+    ) -> IcicleResult<()>;
+
     fn circuit_evaluate(
         circuit: &Circuit<F>,
         num_circuits: usize,
-        evaluations: &HostOrDeviceSlice2D<F>,
+        evaluations: &mut HostOrDeviceSlice2D<F>,
     ) -> IcicleResult<()>;
+
     fn circuit_subset_evaluations(
         circuit: &Circuit<F>,
         num_circuits: usize,
         layer_index: u8,
         evaluations: &HostOrDeviceSlice2D<F>,
-        subset_evaluations: &HostOrDeviceSlice2D<F>,
+        subset_evaluations: &mut HostOrDeviceSlice2D<F>,
     ) -> IcicleResult<()>;
 
     fn mul_by_scalar(arr: &mut HostOrDeviceSlice<F>, scalar: F, n: u32) -> IcicleResult<()>;
@@ -193,7 +199,7 @@ pub trait Virgo<F: FieldImpl> {
         f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
         bookeeping_g: &HostOrDeviceSlice<F>,
         bookeeping_u: &HostOrDeviceSlice<F>,
-        output: &HostOrDeviceSlice2D<F>,
+        output: &mut HostOrDeviceSlice2D<F>,
     ) -> IcicleResult<()>;
 
     fn initialize_combining_point(
@@ -203,6 +209,25 @@ pub trait Virgo<F: FieldImpl> {
         reverse_exts: &HostOrDeviceSlice<ReverseSparseMultilinearExtension>,
         output: &mut HostOrDeviceSlice<F>,
     ) -> IcicleResult<()>;
+
+    fn fold_multi(
+        domain: &HostOrDeviceSlice<F>,
+        random_point: F,
+        evaluations: &HostOrDeviceSlice2D<F>,
+        output: &mut HostOrDeviceSlice2D<F>,
+    ) -> IcicleResult<()>;
+
+    fn dense_mle_multi(
+        output: &mut HostOrDeviceSlice<F>,
+        evaluations: HostOrDeviceSlice2D<F>,
+        input: Vec<F>,
+    ) -> IcicleResult<()>;
+
+    fn mul_arr_multi(a: &mut HostOrDeviceSlice2D<F>, b: &HostOrDeviceSlice2D<F>) -> IcicleResult<()>;
+
+    fn sub_arr_multi(a: &mut HostOrDeviceSlice2D<F>, b: &HostOrDeviceSlice2D<F>) -> IcicleResult<()>;
+
+    fn mul_by_scalar_multi(arr: &mut HostOrDeviceSlice2D<F>, scalar: F) -> IcicleResult<()>;
 }
 
 pub fn bk_sum_all_case_1<F>(
@@ -293,7 +318,7 @@ where
 pub fn circuit_evaluate<F>(
     circuit: &Circuit<F>,
     num_circuits: usize,
-    evaluations: &HostOrDeviceSlice2D<F>,
+    evaluations: &mut HostOrDeviceSlice2D<F>,
 ) -> IcicleResult<()>
 where
     F: FieldImpl,
@@ -307,7 +332,7 @@ pub fn circuit_subset_evaluations<F>(
     num_circuits: usize,
     layer_index: u8,
     evaluations: &HostOrDeviceSlice2D<F>,
-    subset_evaluations: &HostOrDeviceSlice2D<F>,
+    subset_evaluations: &mut HostOrDeviceSlice2D<F>,
 ) -> IcicleResult<()>
 where
     F: FieldImpl,
@@ -370,7 +395,7 @@ pub fn initialize_phase_2_plus<F>(
     f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<F>>,
     bookeeping_g: &HostOrDeviceSlice<F>,
     bookeeping_u: &HostOrDeviceSlice<F>,
-    output: &HostOrDeviceSlice2D<F>,
+    output: &mut HostOrDeviceSlice2D<F>,
 ) -> IcicleResult<()>
 where
     F: FieldImpl,
@@ -404,6 +429,66 @@ where
         reverse_exts,
         output,
     )
+}
+
+pub fn exchange_evaluations<F>(
+    evaluations: &HostOrDeviceSlice2D<F>,
+    output: &mut HostOrDeviceSlice<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::exchange_evaluations(evaluations, output)
+}
+
+pub fn fold_multi<F>(
+    domain: &HostOrDeviceSlice<F>,
+    random_point: F,
+    evaluations: &HostOrDeviceSlice2D<F>,
+    output: &mut HostOrDeviceSlice2D<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::fold_multi(domain, random_point, evaluations, output)
+}
+
+pub fn dense_mle_multi<F>(
+    output: &mut HostOrDeviceSlice<F>,
+    evaluations: HostOrDeviceSlice2D<F>,
+    input: Vec<F>,
+) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::dense_mle_multi(output, evaluations, input)
+}
+
+pub fn mul_arr_multi<F>(a: &mut HostOrDeviceSlice2D<F>, b: &HostOrDeviceSlice2D<F>) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::mul_arr_multi(a, b)
+}
+
+pub fn sub_arr_multi<F>(a: &mut HostOrDeviceSlice2D<F>, b: &HostOrDeviceSlice2D<F>) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::sub_arr_multi(a, b)
+}
+
+pub fn mul_by_scalar_multi<F>(a: &mut HostOrDeviceSlice2D<F>, scalar: F) -> IcicleResult<()>
+where
+    F: FieldImpl,
+    <F as FieldImpl>::Config: Virgo<F>,
+{
+    <<F as FieldImpl>::Config as Virgo<F>>::mul_by_scalar_multi(a, scalar)
 }
 
 #[macro_export]
@@ -488,6 +573,16 @@ macro_rules! impl_virgo {
             }
 
             extern "C" {
+                #[link_name = concat!($field_prefix, "ExchangeEvaluations")]
+                pub(crate) fn _exchange_evaluations(
+                    num_evaluations: u32,
+                    evaluation_size: u32,
+                    evaluations: *const *const $field,
+                    output: *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
                 #[link_name = concat!($field_prefix, "CircuitEvaluate")]
                 pub(crate) fn _circuit_evaluate(
                     circuit: &Circuit<$field>,
@@ -502,7 +597,7 @@ macro_rules! impl_virgo {
                     circuit: &Circuit<$field>,
                     num_subcircuits: u32,
                     layer_index: u8,
-                    evaluations: *const *mut $field,
+                    evaluations: *const *const $field,
                     subset_evaluations: *const *mut $field,
                 ) -> CudaError;
             }
@@ -554,6 +649,60 @@ macro_rules! impl_virgo {
                     bookeeping_rs: *const *const $field,
                     reverse_exts: *const ReverseSparseMultilinearExtension,
                     output: *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "FoldMulti")]
+                pub(crate) fn _fold_multi(
+                    domain: *const $field,
+                    domain_size: u32,
+                    num_replicas: u32,
+                    random_point: $field,
+                    evaluations: *const *const $field,
+                    evaluation_size: u32,
+                    output: *const *mut $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "DenseMleMulti")]
+                pub(crate) fn _dense_mle_multi(
+                    num_mle: u32,
+                    output: *mut $field,
+                    evaluations: *const *mut $field,
+                    evaluation_size: u32,
+                    on_host_input: *const $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "MulArrMulti")]
+                pub(crate) fn _mul_arr_multi(
+                    num_arr: u32,
+                    size: u32,
+                    a: *const *mut $field,
+                    b: *const *const $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "SubArrMulti")]
+                pub(crate) fn _sub_arr_multi(
+                    num_arr: u32,
+                    size: u32,
+                    a: *const *mut $field,
+                    b: *const *const $field,
+                ) -> CudaError;
+            }
+
+            extern "C" {
+                #[link_name = concat!($field_prefix, "MulByScalarMulti")]
+                pub(crate) fn _mul_by_scalar_multi(
+                    num_arr: u32,
+                    size: u32,
+                    a: *const *mut $field,
+                    scalar: $field,
                 ) -> CudaError;
             }
         }
@@ -655,13 +804,28 @@ macro_rules! impl_virgo {
                 }
             }
 
+            fn exchange_evaluations(
+                evaluations: &HostOrDeviceSlice2D<$field>,
+                output: &mut HostOrDeviceSlice<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_exchange_evaluations(
+                        evaluations.len() as u32,
+                        evaluations[0].len() as u32,
+                        evaluations.as_ptr(),
+                        output.as_mut_ptr(),
+                    )
+                    .wrap()
+                }
+            }
+
             fn circuit_evaluate(
                 circuit: &Circuit<$field>,
                 num_circuits: usize,
-                evaluations: &HostOrDeviceSlice2D<$field>,
+                evaluations: &mut HostOrDeviceSlice2D<$field>,
             ) -> IcicleResult<()> {
                 unsafe {
-                    $field_prefix_ident::_circuit_evaluate(circuit, num_circuits as u32, evaluations.as_ptr_mut_inner())
+                    $field_prefix_ident::_circuit_evaluate(circuit, num_circuits as u32, evaluations.as_mut_ptr())
                         .wrap()
                 }
             }
@@ -671,15 +835,15 @@ macro_rules! impl_virgo {
                 num_circuits: usize,
                 layer_index: u8,
                 evaluations: &HostOrDeviceSlice2D<$field>,
-                subset_evaluations: &HostOrDeviceSlice2D<$field>,
+                subset_evaluations: &mut HostOrDeviceSlice2D<$field>,
             ) -> IcicleResult<()> {
                 unsafe {
                     $field_prefix_ident::_circuit_subset_evaluations(
                         circuit,
                         num_circuits as u32,
                         layer_index,
-                        evaluations.as_ptr_mut_inner(),
-                        subset_evaluations.as_ptr_mut_inner(),
+                        evaluations.as_ptr(),
+                        subset_evaluations.as_mut_ptr(),
                     )
                     .wrap()
                 }
@@ -713,7 +877,7 @@ macro_rules! impl_virgo {
                         num_layers,
                         output_size,
                         f_extensions.as_ptr(),
-                        s_evaluations.as_ptr_const_inner(),
+                        s_evaluations.as_ptr(),
                         bookeeping_g.as_ptr(),
                         output.as_mut_ptr(),
                     )
@@ -727,7 +891,7 @@ macro_rules! impl_virgo {
                 f_extensions: &HostOrDeviceSlice<SparseMultilinearExtension<$field>>,
                 bookeeping_g: &HostOrDeviceSlice<$field>,
                 bookeeping_u: &HostOrDeviceSlice<$field>,
-                output: &HostOrDeviceSlice2D<$field>,
+                output: &mut HostOrDeviceSlice2D<$field>,
             ) -> IcicleResult<()> {
                 unsafe {
                     $field_prefix_ident::_initialize_phase_2_plus(
@@ -736,7 +900,7 @@ macro_rules! impl_virgo {
                         f_extensions.as_ptr(),
                         bookeeping_g.as_ptr(),
                         bookeeping_u.as_ptr(),
-                        output.as_ptr_mut_inner(),
+                        output.as_mut_ptr(),
                     )
                     .wrap()
                 }
@@ -753,11 +917,71 @@ macro_rules! impl_virgo {
                     $field_prefix_ident::_initialize_combining_point(
                         num_layers,
                         on_host_bookeeping_rs_size.as_ptr(),
-                        bookeeping_rs.as_ptr_const_inner(),
+                        bookeeping_rs.as_ptr(),
                         reverse_exts.as_ptr(),
                         output.as_mut_ptr(),
                     )
                     .wrap()
+                }
+            }
+
+            fn fold_multi(
+                domain: &HostOrDeviceSlice<$field>,
+                random_point: $field,
+                evaluations: &HostOrDeviceSlice2D<$field>,
+                output: &mut HostOrDeviceSlice2D<$field>,
+            ) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_fold_multi(
+                        domain.as_ptr(),
+                        domain.len() as u32,
+                        evaluations.len() as u32,
+                        random_point,
+                        evaluations.as_ptr(),
+                        evaluations[0].len() as u32,
+                        output.as_mut_ptr(),
+                    )
+                    .wrap()
+                }
+            }
+
+            fn dense_mle_multi(
+                output: &mut HostOrDeviceSlice<$field>,
+                mut evaluations: HostOrDeviceSlice2D<$field>,
+                on_host_input: Vec<$field>,
+            ) -> IcicleResult<()> {
+                let evaluation_size = evaluations[0].len();
+
+                unsafe {
+                    $field_prefix_ident::_dense_mle_multi(
+                        output.len() as u32,
+                        output.as_mut_ptr(),
+                        evaluations.as_mut_ptr(),
+                        evaluation_size as u32,
+                        on_host_input.as_ptr(),
+                    )
+                    .wrap()
+                }
+            }
+
+            fn mul_arr_multi(a: &mut HostOrDeviceSlice2D<$field>, b: &HostOrDeviceSlice2D<$field>) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_mul_arr_multi(a.len() as u32, a[0].len() as u32, a.as_mut_ptr(), b.as_ptr())
+                        .wrap()
+                }
+            }
+
+            fn sub_arr_multi(a: &mut HostOrDeviceSlice2D<$field>, b: &HostOrDeviceSlice2D<$field>) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_sub_arr_multi(a.len() as u32, a[0].len() as u32, a.as_mut_ptr(), b.as_ptr())
+                        .wrap()
+                }
+            }
+
+            fn mul_by_scalar_multi(a: &mut HostOrDeviceSlice2D<$field>, scalar: $field) -> IcicleResult<()> {
+                unsafe {
+                    $field_prefix_ident::_mul_by_scalar_multi(a.len() as u32, a[0].len() as u32, a.as_mut_ptr(), scalar)
+                        .wrap()
                 }
             }
         }

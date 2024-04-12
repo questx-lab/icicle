@@ -85,4 +85,22 @@ namespace virgo {
 
     return CHK_LAST();
   }
+
+  template <typename S>
+  __global__ void exchange_evaluations_kernel(uint32_t n_evaluations, S** evaluations, S* output)
+  {
+    uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+    uint32_t absolute_index = tid;
+    uint32_t relative_index = tid / n_evaluations;
+    uint32_t evaluation_index = tid % n_evaluations;
+
+    output[absolute_index] = evaluations[evaluation_index][relative_index];
+  }
+
+  template <typename S>
+  cudaError_t exchange_evaluations(uint32_t n_evaluations, uint32_t evaluation_size, S** evaluations, S* output)
+  {
+    auto [num_blocks, num_threads] = find_thread_block(n_evaluations * evaluation_size);
+    exchange_evaluations_kernel<<<num_blocks, num_threads>>>(n_evaluations, evaluations, output);
+  }
 } // namespace virgo

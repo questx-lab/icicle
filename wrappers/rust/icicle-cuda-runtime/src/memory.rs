@@ -9,7 +9,6 @@ use crate::stream::CudaStream;
 use std::mem::{size_of, MaybeUninit};
 use std::ops::{Index, IndexMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 use std::os::raw::c_void;
-use std::time::Instant;
 
 pub trait ToCuda {
     type CudaRepr;
@@ -72,7 +71,36 @@ pub struct HostOrDeviceSlice2D<T> {
     ptr: HostOrDeviceSlice<*mut T>,
 }
 
+impl<T: Clone> Clone for HostOrDeviceSlice2D<T> {
+    fn clone(&self) -> Self {
+        let new_origin = self
+            .origin
+            .clone();
+
+        Self::ref_from(new_origin).unwrap()
+    }
+}
+
 impl<T> HostOrDeviceSlice2D<T> {
+    pub fn malloc(size: Vec<usize>) -> CudaResult<Self> {
+        let mut origin = vec![];
+        let mut mut_origin_ptr = vec![];
+        for i in 0..size.len() {
+            let mut device = if size[i] > 0 {
+                HostOrDeviceSlice::cuda_malloc(size[i])?
+            } else {
+                HostOrDeviceSlice::on_host(vec![])
+            };
+
+            mut_origin_ptr.push(device.as_mut_ptr());
+            origin.push(device);
+        }
+
+        let mut_ptr = HostOrDeviceSlice::on_device(&mut_origin_ptr)?;
+
+        Ok(Self { origin, ptr: mut_ptr })
+    }
+
     pub fn zeros(size: Vec<usize>) -> CudaResult<Self> {
         let mut origin = vec![];
         let mut mut_origin_ptr = vec![];
@@ -118,12 +146,12 @@ impl<T> HostOrDeviceSlice2D<T> {
         Ok(Self { origin, ptr: mut_ptr })
     }
 
-    pub fn as_ptr_const_inner(&self) -> *const *const T {
+    pub fn as_ptr(&self) -> *const *const T {
         self.ptr
             .as_ptr() as *const *const T
     }
 
-    pub fn as_ptr_mut_inner(&self) -> *const *mut T {
+    pub fn as_mut_ptr(&mut self) -> *const *mut T {
         self.ptr
             .as_ptr()
     }
@@ -167,9 +195,9 @@ impl<T> HostOrDeviceSlice3D<T> {
         let mut origin = vec![];
         let mut mut_origin_ptr = vec![];
         for subsize in size {
-            let device = HostOrDeviceSlice2D::zeros(subsize)?;
+            let mut device = HostOrDeviceSlice2D::zeros(subsize)?;
 
-            mut_origin_ptr.push(device.as_ptr_mut_inner());
+            mut_origin_ptr.push(device.as_mut_ptr());
             origin.push(device);
         }
 
@@ -182,9 +210,9 @@ impl<T> HostOrDeviceSlice3D<T> {
         let mut origin = vec![];
         let mut ptr = vec![];
         for v2d in val {
-            let device = HostOrDeviceSlice2D::new(v2d)?;
+            let mut device = HostOrDeviceSlice2D::new(v2d)?;
 
-            ptr.push(device.as_ptr_mut_inner());
+            ptr.push(device.as_mut_ptr());
             origin.push(device);
         }
 
@@ -484,7 +512,7 @@ impl<T> HostOrDeviceSlice<T> {
         Ok(())
     }
 
-    pub fn device_copy_partially(&mut self, src: &Self, dst_index: usize) -> CudaResult<()> {
+    pub fn device_copy_partially(&mut self, src: &Self, src_index: usize, dst_index: usize) -> CudaResult<()> {
         match self {
             Self::Device(_, device_id) => check_device(*device_id),
             Self::DeviceRef(_, device_id) => check_device(*device_id),
@@ -492,58 +520,29 @@ impl<T> HostOrDeviceSlice<T> {
         };
 
         assert!(
-            self.len() - dst_index >= src.len(),
+            self.len() - dst_index >= src.len() - src_index,
             "Destination has a larger size than source"
         );
 
-        let size = size_of::<T>() * src.len();
+        let size = size_of::<T>() * (src.len() - src_index);
         if size != 0 {
-            match &src {
-                Self::Host(h) => unsafe {
-                    cudaMemcpy(
-                        self.as_mut_ptr()
-                            .wrapping_add(dst_index) as *mut c_void,
-                        h.as_ptr() as *const c_void,
-                        size,
-                        cudaMemcpyKind::cudaMemcpyHostToDevice,
-                    )
-                    .wrap()?
-                },
-                Self::Device(option_s, device_id) => {
-                    check_device(*device_id);
+            let kind = if src.is_on_device() {
+                cudaMemcpyKind::cudaMemcpyDeviceToDevice
+            } else {
+                cudaMemcpyKind::cudaMemcpyHostToDevice
+            };
 
-                    match option_s {
-                        None => panic!("invalid source address"),
-                        Some((s, _)) => unsafe {
-                            cudaMemcpy(
-                                self.as_mut_ptr()
-                                    .wrapping_add(dst_index) as *mut c_void,
-                                *s as *const c_void,
-                                size,
-                                cudaMemcpyKind::cudaMemcpyDeviceToDevice,
-                            )
-                            .wrap()?
-                        },
-                    }
-                }
-                Self::DeviceRef(option_s, device_id) => {
-                    check_device(*device_id);
-
-                    match option_s {
-                        None => panic!("invalid source address"),
-                        Some((s, _)) => unsafe {
-                            cudaMemcpy(
-                                self.as_mut_ptr()
-                                    .wrapping_add(dst_index) as *mut c_void,
-                                *s as *const c_void,
-                                size,
-                                cudaMemcpyKind::cudaMemcpyDeviceToDevice,
-                            )
-                            .wrap()?
-                        },
-                    }
-                }
-            }
+            unsafe {
+                cudaMemcpy(
+                    self.as_mut_ptr()
+                        .wrapping_add(dst_index) as *mut c_void,
+                    src.as_ptr()
+                        .wrapping_add(src_index) as *const c_void,
+                    size,
+                    kind,
+                )
+                .wrap()?;
+            };
         }
         Ok(())
     }
