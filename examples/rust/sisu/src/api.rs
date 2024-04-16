@@ -10,15 +10,15 @@ mod test {
 
     use icicle_bn254::curve::ScalarField as IcicleFrBN254;
     use icicle_core::traits::FieldImpl;
-    use icicle_core::virgo::bk_produce_case_1;
-    use icicle_core::virgo::bk_produce_case_2;
-    use icicle_core::virgo::bk_reduce;
-    use icicle_core::virgo::bk_sum_all_case_1;
-    use icicle_core::virgo::bk_sum_all_case_2;
-    use icicle_core::virgo::build_merkle_tree;
-    use icicle_core::virgo::hash_merkle_tree_slice;
-    use icicle_core::virgo::MerkleTreeConfig;
-    use icicle_core::virgo::SumcheckConfig;
+    use icicle_core::sisu::bk_produce_case_1;
+    use icicle_core::sisu::bk_produce_case_2;
+    use icicle_core::sisu::bk_reduce;
+    use icicle_core::sisu::bk_sum_all_case_1;
+    use icicle_core::sisu::bk_sum_all_case_2;
+    use icicle_core::sisu::build_merkle_tree;
+    use icicle_core::sisu::hash_merkle_tree_slice;
+    use icicle_core::sisu::MerkleTreeConfig;
+    use icicle_core::sisu::SumcheckConfig;
     use icicle_cuda_runtime::memory::HostOrDeviceSlice;
     use rand::rngs::StdRng;
     use rand::Rng;
